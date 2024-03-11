@@ -1,0 +1,5 @@
+sudo ufw enable
+sudo ufw allow portnum
+sudo cp libmpxhwrelaxd.so /usr/local/lib
+
+g++ -static-libgcc -static-libstdc++ -o Timepix_Controller Timepix_Controller.cpp

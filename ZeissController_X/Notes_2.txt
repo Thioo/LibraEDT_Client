@@ -1,0 +1,105 @@
+#include <thread>
+#include <mutex>
+#include <queue>
+#include <condition_variable>
+
+// Structure to store an image
+struct Image {
+  int id;
+  std::vector<char> data;
+};
+
+std::mutex image_queue_mutex;
+std::condition_variable image_queue_cond;
+std::queue<Image> image_queue;
+bool stop_reading = false;
+
+// Function that reads images
+void ReadImages() {
+  int id = 0;
+  while (!stop_reading) {
+    // Read an image
+    Image image;
+    image.id = id++;
+    image.data = ReadImageFromCamera();
+
+    // Add the image to the queue
+    std::unique_lock<std::mutex> lock(image_queue_mutex);
+    image_queue.push(image);
+    lock.unlock();
+
+    // Notify the save thread that a new image is available
+    image_queue_cond.notify_one();
+  }
+}
+
+// Function that saves images
+void SaveImages() {
+  while (!stop_reading) {
+    // Wait for a new image to be available
+    std::unique_lock<std::mutex> lock(image_queue_mutex);
+    image_queue_cond.wait(lock, []() { return !image_queue.empty(); });
+
+    // Save the image
+    Image image = image_queue.front();
+    image_queue.pop();
+    lock.unlock();
+    SaveImageToDisk(image.id, image.data);
+  }
+}
+
+int main() {
+  // Start the read thread
+  std::thread read_thread(ReadImages);
+
+  // Start the save thread
+  std::thread save_thread(SaveImages);
+
+  // Wait for the read thread to finish
+  read_thread.join();
+
+  // Set the stop flag
+  stop_reading = true;
+
+  // Notify the save thread that the reading has stopped
+  image_queue_cond.notify_one();
+
+  // Wait for the save thread to finish
+  save_thread.join();
+
+  return 0;
+}
+
+
+
+
+// flat field correction with normalization
+
+In addition to flat-field correction, several other corrections may be applied to raw diffraction images to improve the quality of the data for further analysis. Some of the common corrections include:
+
+Dark-field correction: This correction removes the contribution of the dark current, or the electronic noise, in the detector. A dark-field image is typically acquired by exposing the detector in the absence of any illumination and is subtracted from the raw diffraction image to correct for the dark current.
+
+Bad pixel correction: This correction removes the effect of dead or hot pixels, which are pixels that produce an abnormally high or low signal due to a defect in the detector. Bad pixels can be identified and corrected using a dark-field image, or by using a mask that defines the locations of the bad pixels.
+
+Gain correction: This correction accounts for variations in the gain, or the sensitivity, of the detector across different pixels. The gain correction is typically performed using a gain map, which represents the expected gain for each pixel.
+
+Distortion correction: This correction accounts for geometric distortions in the diffraction image, such as radial and tangential distortion, that can affect the accuracy of the analysis. The distortion correction is typically performed using a distortion map, which represents the expected distortion for each pixel.
+
+Polarization correction: This correction accounts for the polarization of the illumination and the detector, which can affect the intensity of the diffracted spots. The polarization correction is typically performed using a polarization map, which represents the expected polarization for each pixel.
+
+Background correction: This correction removes the contribution of the background, which can arise from scattered light, parasitic reflections, and other sources. The background correction is typically performed using a background subtraction method, such as a median filter or a wavelet transform.
+
+These are some of the common corrections that may be applied to raw diffraction images. The specific corrections that are needed will depend on the specific requirements of the analysis and the properties of the raw data.
+
+
+Yes, flat-field correction and dark-field correction can be applied at the same time. Flat-field correction corrects for variations in the illumination and sensitivity of the detector, while dark-field correction corrects for the contribution of the dark current, or electronic noise, in the detector. By combining these two corrections, the raw diffraction image can be corrected for both systematic and random effects, resulting in a more uniform background and improved signal-to-noise ratio.
+
+The flat-field and dark-field corrections are typically performed in the following order:
+
+Acquire a flat-field image and a dark-field image.
+Subtract the dark-field image from the raw diffraction image to remove the contribution of the dark current.
+Divide the result of the dark-field correction by the flat-field image to correct for variations in the illumination and sensitivity of the detector.
+By applying both flat-field and dark-field correction to the raw diffraction image, the quality of the data can be significantly improved for further analysis.
+
+
+// flat field correction with normalization ends.

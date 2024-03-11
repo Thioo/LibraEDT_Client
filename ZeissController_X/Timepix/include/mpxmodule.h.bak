@@ -1,0 +1,134 @@
+typedef struct _AcqParams
+{
+    BOOL useHwTimer;                    // hw timer is used
+    BOOL enableCst;                     // enable Charge Sharing Test
+    BOOL polarityPositive;              // positive polarity
+    int mode;                           // acq mode (see ACQMODE_xxx in common.h)
+    int acqCount;                       // acq count (>1 for burst mode)
+    double time;                        // acq time (if controlled by HW timer)
+} AcqParams;
+
+
+typedef struct _DevInfo
+{
+    int pixCount;                       // total number of pixels
+    int rowLen;                         // length of row in pixels (e.g 256 for single chip, 512 for quad);
+    int numberOfChips;                  // number of chips
+    int numberOfRows;                   // number of rows in which chips are aligned (e.g. quad has 4 chips, which are in 2 rows)
+    int mpxType;                        // medipix type - MPX_ORIG, MPX_MXR, MPX_TPX
+    char chipboardID[64];    // id of chip/chipboard
+    const char *ifaceName;              // name of interface
+
+    unsigned int suppAcqModes;                   // supported acq. mode bitwise combinations of ACQMODE_xxx flags
+    int suppCallback;                  // callback is supported (acq. is finished, triggers)
+
+    double clockReadout;                // clock frequency [MHz] for readout
+    double clockTimepix;                // clock in frequency [MHz] for Timepix information
+    // hw timer capabilities
+    double timerMinVal;                 // minimum value of hw timer [s]
+    double timerMaxVal;                 // maximum value of hw timer [s]
+    double timerStep;                   // step of hw timer [s]
+
+    // test pulse capabilities
+    unsigned int maxPulseCount;                  // maximum number of pulses that can be sent
+    double maxPulseHeight;              // max pulse height [V]
+    double maxPulsePeriod;              // max period of pulses [s], length of pulse should be period/2
+
+    // ext DAC capabilities
+    double extDacMinV;                  // minimum external DAC voltage
+    double extDacMaxV;                  // maximum external DAC voltage
+    double extDacStep;                  // ext. DAC step size
+} DevInfo;
+
+typedef struct _MpxModule
+{
+ 
+ 
+    bool    _waitingForTrigger;
+
+ 
+    unsigned int     _confReg;
+    bool    _confRegValid;
+    friend class MpxDaq; //todo
+    MpxDaq *_daqThreadHandler;
+
+   
+
+
+    
+    int        _id;
+    DevInfo    _devInfo;
+    AcqParams  _acqPars;
+    unsigned int        _chipMap[4];// Index to chip number map
+    unsigned int        _chipId[4]; // Chip IDs (24 bits)
+    void *_hwInfoItems;   // Hardware specific items
+
+    Fsr       *_fsr[4];
+    bool       _fsrValid[4];
+
+    char       _ipAddressChar[512];
+    char       _chipNames[128];
+
+    unsigned int        _relaxdFwVersion;       // Relaxd firmware version
+    bool       _logVerbose;            // Verbose logging (not just errors)
+
+    unsigned int        _frameCnt;              // software frame counter ( != lastFrameCount )
+
+    int     _callbackData;          // Provided and used by/for PixelMan
+    void* _callback;              // Provided and used by/for PixelMan
+
+    double     _startTime;             // Start time of acquisition
+    
+
+    unsigned int        _ipAddress;             // IP address of device
+    unsigned int        _portNumber;            // Port number used for communication
+    unsigned int        _biasAdjust;            // Sensor bias voltage
+    unsigned int        _vddAdjust;             // Medipix VDD supply adjustment
+    float      _testPulseLow;
+    float      _testPulseHigh;
+    unsigned int        _testPulseFreq;         // Testpulse frequency
+    bool       _parReadout;            // Parallel read-out enabled or not
+    bool       _storePixelsCfg;        // Indicate to RelaxD to save next config
+
+    unsigned int        _u32ForPixelman;        // For transferring unsigned int HW items
+    float      _floatForPixelman;      // For transferring float HW items
+    unsigned int        _boolForPixelman;       // Pixelman can't handle 'bool' type;
+    // this is a placeholder for several
+    int        _lastMpxErr;
+    char     _lastErrStr[24];            // Description of last error (string)
+
+	MpxSocketMgrRt *_sockMgr;
+
+    // Socket for monitoring data readout
+	MpxSocketMgr *_sockMonMgr;
+
+	// Logging classes
+	bool	   _logManaged;	// logger created by this class (default logger)
+
+    // Output stream for (standalone) data storage
+    char   _fData[176];
+    int        _storedFrames;
+
+    // Frame meta data from Relaxd
+    unsigned int         _lastClockTick;         // Relaxd module clock
+    unsigned short         _lastFrameCount;        // Relaxd module frame counter
+
+    // Class version
+    static const char _versionStr[24];
+    static       unsigned int    _version;
+
+    // Whether or not a new frame is available for read-out
+    bool        _newFrame;
+
+    void * _curCfg;
+    bool _rmNotRequired;
+    int _lostRowRetryCnt;
+  
+    void    setInvalidLutZero(BOOL invalidLutZero);
+    MpxLogger *_log;
+    MpxCodecMgr* _codec;
+    bool _hasGaps;
+    BOOL _invalidLutZero;
+    MpxPimpl *_pimpl;
+}MpxModule;
+

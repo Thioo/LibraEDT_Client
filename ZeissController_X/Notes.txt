@@ -1,0 +1,148 @@
+TODO:
+
+Take Image before recording, for better offset matching!
+Try to fix for backlash correction
+
+
+2023_05_05: Trying to setup for TEM Mode Data Collection
+	- Manual Illumination Selection (MIS) -> Check if we can change the holes from the app.
+	- Illumination Mode ( TEM vs SPOT)
+	- Image Mode ( Image vs Diffraction)
+	- IMPORTANT: Illumination shift calibration - Find the condenser aperture circle. shift it several times and get calculate the current needed to shift 1 pixel.
+	
+
+
+	TODO: 
+	Check intensity linearity with spotsize or current (uA)
+	crossfix
+	"Already done..."
+		find strongest intensity
+		Beam centering so that all the frames have same central coordinate
+		create smv file (.img) compatible with xds and dials
+		start making the .pets file
+		start making the .xds file
+
+	Use the LIVESTREAM to move the beam by moving the mouse!
+	
+	TESTS:
+	SingleRun EucentricHeigh works, Double Run doesn't work, check why.
+	Adjusting the Z Value while rotating isn't as smooth as it should be sometimes, check why!
+	
+
+	check DP_X_BACKLASH, Y, Z, T, R, 
+	CHECK the is stage busy/ is stage rotation method
+	Test this condition:
+				while (fabs(m_pStage->GetCurrentTAngle() - m_fEndingAng) > 0.001f && m_pStage->isStageRotating());
+					Not sure how effective/accurate it is.
+
+	ctrl+f the TODOs
+						TODO: 
+									CHANGE CString to std::string 
+									Consider the rotation speed ramping during the first few seconds when doing the tracking (2 parts, 1. ramping, 2. constant speed)
+										I guess by "assuming" how long it takes for the rotation to be constant
+									*OpenCV for image processing/cross correlation
+									https://learnopencv.com/reading-and-writing-videos-using-opencv/
+
+									*Linear Movement Implementation
+										MoveStage with pixel coordinates
+										MoveStage with stage(um) coordinates
+										
+									Finding automatically the eucentric height
+										https://www.sciencedirect.com/science/article/abs/pii/030439919290016D?via%3Dihub
+										https://onlinelibrary.wiley.com/doi/abs/10.1046/j.0022-2720.2001.00987.x
+
+
+									Clean the code
+									Start commenting and describing the methods
+
+2022_11_XX_Start
+2022_11_XX_End
+
+2022_11_21_Start
+	Implementation of CZeissQuickControl, so that we can perhaps reduce the WINTEM software and have the whole desktop free
+		We will need an empty desktop if we want to stream the detector's images (diffraction patterns)
+	Implementation of CTimepix - to control the timepix detector 
+
+			TODO:
+			Backlash correction for stage XYZ movements
+2022_11_21_End
+
+2022_11_01_Start
+	Many things, but I guess more relevant things are:
+		- Bug fix
+		- Different ways of "Tracking" a crystal, by moving the stage, or by moving the beam
+			- Time based -> calibration and collection have to be done on the same rotation speed
+			- Angle based (not sure it's properly working), might be useful if calibration and collection are done for different rotation speeds
+		- "Calibrate"/"Record" using differnet approches,
+			- continuously, we're constantly monitoring the crystal's position using the stage joystick
+			- Image based: images are taken every x degrees and later on shown to the user, who simply has to select the position of interest
+		- Automatically finding the eucentric height (still working on it)
+			- For now, the user has to find a z value so that the crystal doesn't run out of the field of view
+			- then, images are taken every x degrees and shown to the user
+			- the correct/estimated z value is calculated from that
+			- We'll try to find different z values for different tilting ranges and take that into account when doing data collection, or better, during calibration
+
+
+2022_11_06_End
+
+2022_10_23_Start
+		
+		Implementation of fast fourier transform and phase fourier to compare two images and return the image shift (translation)
+			This is intented to be only used for image taken on the same conditions (same tilt angle, magnification, etc.)
+		Made sure that the OpenCV is properly working on the TEM's computer.
+		Create CImageManager to deal with the STEM images. We will then use these images to click on coordinates of interest
+			to maybe try to find the correct eucentric height, or follow the path of a given crystal during rotation.
+
+2022_10_23_End
+
+
+2022_10_22_Start
+		Loads and loads and loads of different things, too hard to keep track of :). 
+		Start editing the Data_Collection Dialog/Class
+		Implement Backlash Correction
+		Timer and Angle based StageXY coordinates storage (for tracking by shifting the stage pos) - map<struct, struct>
+		Timer and Angle based ScreenXY coordinates storage (for tracking by shifting the beam) - map
+		Maybe make it flexible ? by allowing the user to run as many "pre-runs" as they like
+			simply by checking/unchecking a checkbox and storage the different runs in a array/vector (?)
+
+2022_10_22_End
+
+
+2022_10_20_Start
+	Updated AcquireSTEMImage to produce .tiff files (containing some relevant microscopic information in the headers), or windows bitmap (.bmp)
+	Tried (Failed) creating a menu context to open a new dialog for data collection and more...
+
+	
+2022_10_20_End
+
+
+2022_10_13_Start
+	Implemented Grab/Capture/AcquireSTEMImage function
+	Updated ZeissController_XDlg.cpp
+	Started implementing useful getters (GetCameraLength, GetSpotSize, GetWidth, GetSpotPosX, GetStageX,)
+	Updated ZeissController_XDlg.cpp with Testing API Functions
+	Updated CZeissStage
+	Implemented stage movements and move stage based on screen pixel 
+
+
+2022_10_13_End
+
+2022_10_12_Start
+	Created a new class (CTEMControlManager) with direct access to the API and API functions.
+	Created a new class (CZeissStage) which will help us manage the stage coordinates (in meters and micrometers)
+	Started building the core functions (Read, Write, Execute, MoveStage, GetStagePosition, PrintErrorMsg, PrintReturnType, ShowAboutBox, CloseControl)
+	Started updating the ZeissController_XDlg.cpp file so that it uses our brand new classes instead.
+	TODO:
+		Implement the other methods, Grab/Capture
+		Finish updating ZeissController_XDlg.cpp to work entirely with the new class
+		Implement the useful functions so we don't have to type the strings manually anymore
+			Get("AP_TEM_MAG"), Get("AP_SPOT_SIZE"), Get("AP_BEAM_POSN_X"), etc.
+			The objective is to end up implementing all the methods available in the future.
+2022_10_12_End
+
+Early tests:
+	Learning how to properly setup and use the api
+	Was able to read almost all the parameters of the microscope. Modifying them however was not working.
+	Ran into some licensing problems which was then fixed 2 weeks later
+	Now we're able to read and write all the parameters of the microscope
+

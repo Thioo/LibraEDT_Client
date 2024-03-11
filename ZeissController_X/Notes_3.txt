@@ -1,0 +1,3 @@
+Fix rotate to -0.50
+Do not unblank after data collection anymore
+

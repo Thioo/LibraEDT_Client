@@ -1,0 +1,251 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="My Headers">
+      <UniqueIdentifier>{4ec5359f-fca0-48e4-a743-73773ebd6274}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="My Headers\Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="My Headers\MZeiss">
+      <UniqueIdentifier>{8a1a3963-feed-4473-b9be-551df6fcd561}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="My Headers\Timepix">
+      <UniqueIdentifier>{12924b09-03c9-42f6-b8b3-5d5115bd2573}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="My Headers\Dialog/GUI">
+      <UniqueIdentifier>{7cf9a627-295b-4922-870a-9a4e62c09992}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="My Headers\Utilities">
+      <UniqueIdentifier>{0ae2c9b0-0962-486c-96c9-9b3d82ba2706}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="My Headers\Timepix\Includes">
+      <UniqueIdentifier>{a63efde3-75b4-4bfc-984a-5fe5d1b32583}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>My Headers\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>My Headers\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>My Headers\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>My Headers\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CZeissDataCollection_Dialog.h">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ZeissControllerX_Dialog.h">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="CLinearMover.h">
+      <Filter>My Headers\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CTimer.h">
+      <Filter>My Headers\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CWriteFile.h">
+      <Filter>My Headers\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CDataCollection.h">
+      <Filter>My Headers\MZeiss</Filter>
+    </ClInclude>
+    <ClInclude Include="CImageManager.h">
+      <Filter>My Headers\MZeiss</Filter>
+    </ClInclude>
+    <ClInclude Include="CTEMControlManager.h">
+      <Filter>My Headers\MZeiss</Filter>
+    </ClInclude>
+    <ClInclude Include="CZeissStage.h">
+      <Filter>My Headers\MZeiss</Filter>
+    </ClInclude>
+    <ClInclude Include="ZeissController_X.h">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="CZeissQuickControl.h">
+      <Filter>My Headers\MZeiss</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\bt.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecIntf.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecMgr.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecPar.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecParSSE2.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecSgl.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\CodecSglSSE2.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\csharpBridge.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\Frame.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\fsr.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\JobBatcher.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\luts.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\MessagePool.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\MessageQueue.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxcodecmgr.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxdaq.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxfilelogger.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxlogger.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxmodule.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxmoduleapi.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxmodulemgr.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxmodulemgrpimpl.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxplatform.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\mpxsocketmgr.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\relaxd.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\ThreadBarrier.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\include\unparam.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\asitypes.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\common.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\mpx3hw.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\mpxerrors.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\mpxhw.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Timepix\common\Relaxdhw.h">
+      <Filter>My Headers\Timepix\Includes</Filter>
+    </ClInclude>
+    <ClInclude Include="CTimepix.h">
+      <Filter>My Headers\Timepix</Filter>
+    </ClInclude>
+    <ClInclude Include="CPostDataCollection.h">
+      <Filter>My Headers\Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CTEMControlManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CZeissStage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CDataCollection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CImageManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CZeissDataCollection_Dialog.cpp">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ZeissControllerX_Dialog.cpp">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="CLinearMover.cpp">
+      <Filter>My Headers\Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="CWriteFile.cpp">
+      <Filter>My Headers\Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="ZeissController_X.cpp">
+      <Filter>My Headers\Dialog/GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="CZeissQuickControl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CTimepix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CPostDataCollection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Windows_Linux_Client_Server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ZeissControllerX.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\ZeissControllerX.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\ZeissController_X.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Notes.txt" />
+    <Text Include="Notes_2.txt" />
+    <Text Include="Notes_3.txt" />
+  </ItemGroup>
+</Project>
