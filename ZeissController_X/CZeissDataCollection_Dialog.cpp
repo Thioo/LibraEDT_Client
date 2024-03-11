@@ -23,6 +23,7 @@ CZeissDataCollection_Dialog::CZeissDataCollection_Dialog(CWnd* pParent /*=nullpt
 	
 	m_pZeissDataCollection = CDataCollection::GetInstance();
 	m_pZeissDataCollection->m_pDlg = this;
+	m_pTEMControlManager   = CTEMControlManager::GetInstance();
 
 	m_pTimepix			   = CTimepix::GetInstance();
 	m_pZeissQuickControl   = new CZeissQuickControl();
@@ -121,8 +122,8 @@ void CZeissDataCollection_Dialog::UpdateDataCollectionParameters()
 	m_pZeissDataCollection->m_iImageBasedTrackingMode = IsDlgButtonChecked(IDC_DC_IMGBASED_ANGLEBASED_CHCKBTN) ? MODE_ANGLE_BASED : MODE_TIME_BASED;
 	m_pZeissDataCollection->m_bMoveMouseTest = IsDlgButtonChecked(IDC_DC_MOVEMOUSE_CHCKBTN);
 	m_pZeissDataCollection->m_bReadjustZValue = IsDlgButtonChecked(IDC_DC_READJUST_Z_CHCKBTN);
-	m_pZeissDataCollection->m_bDo_fine_beam_shift_calibration = IsDlgButtonChecked(IDC_DC_FINE_CALIB);
-
+	m_pZeissDataCollection->m_bCorrectCalibration = IsDlgButtonChecked(IDC_DC_CORRECT_CALIBRATION);
+	m_pTEMControlManager->m_bSaveLensParams = IsDlgButtonChecked(IDC_DC_SAVE_LENS_PARAMS);
 	if (m_pZeissDataCollection->m_bSingleRun == false)
 	{
 		CheckDlgButton(IDC_DC_WAIT_CHCKBTN, false);
@@ -220,6 +221,8 @@ void CZeissDataCollection_Dialog::InitItems()
 	CheckDlgButton(IDC_DC_RECORD_VARIABLE_STEP, false);
 	CheckDlgButton(IDC_DC_READJUST_Z_CHCKBTN, false);
 	CheckDlgButton(IDC_DC_DO_TRACKING, true);
+	CheckDlgButton(IDC_DC_SAVE_LENS_PARAMS, false);
+	CheckDlgButton(IDC_DC_CORRECT_CALIBRATION, false);
 
 	if (pWriter->is_config_loaded)
 	{
@@ -251,6 +254,8 @@ void CZeissDataCollection_Dialog::InitItems()
 		//CheckDlgButton(IDC_DC_LINEAR_MOV_CHECKBTN, pDC->m_bLinearMovementTrack);
 		CheckDlgButton(IDC_DC_MOVEMOUSE_CHCKBTN, pDC->m_bMoveMouseTest);
 		CheckDlgButton(IDC_DC_READJUST_Z_CHCKBTN, pDC->m_bReadjustZValue);
+		CheckDlgButton(IDC_DC_SAVE_LENS_PARAMS, pTem->m_bSaveLensParams);
+		CheckDlgButton(IDC_DC_CORRECT_CALIBRATION, pDC->m_bCorrectCalibration);
 	}
 
 
@@ -883,17 +888,21 @@ void CZeissDataCollection_Dialog::OnBnClickedDcLoadDiffBtn()
 	static auto pTpx = CTimepix::GetInstance();
 	static auto pDC = CDataCollection::GetInstance();
 	static auto pMscope = CTEMControlManager::GetInstance();
+
+	/*if(pDC->m_bCorrectCalibration == false)
+	{
+		pMscope->do_calibrate_focus();
+		//pMscope->do_calibrate_magnification();
+	}*/
 	if (pTpx->m_vTargetBeamCoords.empty() == false)
 	{
 		pMscope->do_blank_beam(true);
 		pMscope->set_image_mode(DIFFRACTION_MODE);
 		auto pos = pTpx->m_vTargetBeamCoords.at(pTpx->m_iTargetBeamCoordsIndex);
 		cv::Point2f dummy;
-		//pDC->do_beam_shift_at_coordinates_optimized(pos, dummy, true);
 		pDC->do_beam_shift_at_coordinates_alternative(pos, true);
 		printf("Pos (%d) -- ", pTpx->m_iTargetBeamCoordsIndex + 1);
-		PRINT("without do_set_current_beam_screen_coordinates"); // pDC->do_set_current_beam_screen_coordinates(pos.x, pos.y);
-		//std::this_thread::sleep_for(2s);
+		pDC->do_set_current_beam_screen_coordinates(pos.x, pos.y);
 		pMscope->do_blank_beam(false);
 	}
 	CWriteFile::GetInstance()->write_params_file();

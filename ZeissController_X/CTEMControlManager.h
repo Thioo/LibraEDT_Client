@@ -44,8 +44,9 @@ public:
 	CZeissStage*		m_pStage;
 	CDataCollection*	m_pZeissDataCollection;
 	CImageManager*		m_pImageManager;
-
+	bool				m_bSaveLensParams;
 	bool Initialised() const { if (m_bInitialised == false) PRINT("API Not Initialied!"); return m_bInitialised; }
+
 private:
 	// Api Setup methods
 	bool InitializeApi();
@@ -93,6 +94,10 @@ public:
 	void  get_illumination_shift_limits(float& _lowerLimitX, float& _upperLimitX, float& _lowerLimitY, float& _upperLimitY);
 	float get_image_shift_x();
 	float get_image_shift_y();
+	float get_illumination_tilt_x();
+	float get_illumination_tilt_y();
+	float get_objective_stig_x();
+	float get_objective_stig_y();
 
 	void set_illumination_shift_x(float fShift);
 	void set_illumination_shift_y(float fShift);
@@ -100,6 +105,9 @@ public:
 	void set_image_shift_x(float fShift);
 	void set_image_shift_y(float fShift);
 	void set_image_shift(float fShiftX, float fShiftY);
+	void set_illumination_tilt_x(float fTilt);
+	void set_illumination_tilt_y(float fTilt);
+	void set_illumination_tilt(float fTiltX, float fTiltY);
 	void set_target_emission__step(float _fStep);
 	
 
@@ -161,6 +169,22 @@ public:
 	int get_large_screen_status();
 	void do_large_screen_up();
 	void do_large_screen_down();
+	
+
+	// Lenses
+	float get_C1_lens();
+	float get_C2_lens();
+	float get_C3_lens();
+	float get_objective_lens();
+	void  set_C1_lens(float _fVal);
+	void  set_C2_lens(float _fVal);
+	void  set_C3_lens(float _fVal);
+	void  set_objective_lens(float _fVal);
+
+	void do_calibrate_magnification();
+	void do_calibrate_focus();
+	void do_calibrate_all();
+
 
 
 	ZeissErrorCode close_control(bool _bPrintErrMsg = false);

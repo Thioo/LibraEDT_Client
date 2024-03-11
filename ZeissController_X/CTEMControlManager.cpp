@@ -2,7 +2,7 @@
 
 CTEMControlManager* CTEMControlManager::m_pZeissControlManager = nullptr;
 
-CTEMControlManager::CTEMControlManager() : m_pZeissApi(nullptr), m_bInitialised(false), m_pStage(nullptr)
+CTEMControlManager::CTEMControlManager() : m_pZeissApi(nullptr), m_bInitialised(false), m_pStage(nullptr), m_bSaveLensParams(false)
 {
     this->CreateConsole(); Sleep(10);
 
@@ -904,6 +904,58 @@ float CTEMControlManager::get_image_shift_y()
 	return 0.0f;
 }
 
+float CTEMControlManager::get_illumination_tilt_x()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_tilt_x\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_ILL_TILT_X", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+float CTEMControlManager::get_illumination_tilt_y()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_tilt_y\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_ILL_TILT_Y", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+
+float CTEMControlManager::get_objective_stig_x()
+{
+	
+}
+
+float CTEMControlManager::get_objective_stig_y()
+{
+
+}
+
+
+
+
 void CTEMControlManager::set_image_shift_x(float fShift)
 {
 	PRINTD("\t\t\t\tCTEMControlManager::set_image_shift_x\n");
@@ -955,6 +1007,57 @@ void CTEMControlManager::set_image_shift(float fShiftX, float fShiftY)
 
 }
 
+
+void CTEMControlManager::set_illumination_tilt_x(float fTilt)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt_x\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = fTilt;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_ILL_TILT_X", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+}
+
+void CTEMControlManager::set_illumination_tilt_y(float fTilt)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt_y\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = fTilt;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_ILL_TILT_Y", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+
+}
+
+void CTEMControlManager::set_illumination_tilt(float fTiltX, float fTiltY)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt\n");
+
+	this->set_illumination_tilt_x(fTiltX);
+	this->set_illumination_tilt_y(fTiltY);
+}
 
 void CTEMControlManager::set_target_emission__step(float _fStep)
 {
@@ -1847,6 +1950,193 @@ void CTEMControlManager::do_large_screen_down()
 	PRINTD("\t\t\t\tCTEMControlManager::DoLargeScreenUp\n");
 
 	std::string sMsg = "CMD_LARGE_SCREEN_DOWN";
+
+	this->zeiss_execute(sMsg.c_str());
+}
+
+float CTEMControlManager::get_C1_lens()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_C1_lens\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_C1_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+float CTEMControlManager::get_C2_lens()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_C2_lens\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_C2_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+float CTEMControlManager::get_C3_lens()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_C3_lens\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_C3_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+float CTEMControlManager::get_objective_lens()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::get_objective_lens\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_OBJECTIVE_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
+}
+
+void CTEMControlManager::set_C1_lens(float _fVal)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_C1_lens(current)\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = _fVal;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_C1_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+}
+
+void CTEMControlManager::set_C2_lens(float _fVal)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_C2_lens(current)\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = _fVal;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_C2_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+}
+
+void CTEMControlManager::set_C3_lens(float _fVal)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_C3_lens(current)\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = _fVal;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_C3_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+}
+
+void CTEMControlManager::set_objective_lens(float _fVal)
+{
+	PRINTD("\t\t\t\tCTEMControlManager::set_objective_lens(current)\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	_var.vt = VT_R4;
+	_var.fltVal = _fVal;
+	ZeissErrorCode zeissRetCode = this->zeiss_write("AP_OBJECTIVE_LENS", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return;
+}
+
+void CTEMControlManager::do_calibrate_magnification()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_magnification\n");
+
+	std::string sMsg = "CMD_CAL_MAG";
+
+	this->zeiss_execute(sMsg.c_str());
+}
+
+void CTEMControlManager::do_calibrate_focus()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_focus\n");
+
+	std::string sMsg = "CMD_CAL_FOCUS";
+
+	this->zeiss_execute(sMsg.c_str());
+}
+
+void CTEMControlManager::do_calibrate_all()
+{
+	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_all\n");
+
+	std::string sMsg = "CMD_CAL_ALL";
 
 	this->zeiss_execute(sMsg.c_str());
 }

@@ -431,10 +431,14 @@ void CPostDataCollection::do_make_pets_header(std::vector<std::string>& _pets_he
 		_pets_header.push_back(std::format("#STEM Mode: Spot Size (nm):\t\t{:.2f}\n", CTEMControlManager::GetInstance()->get_spot_size()));
 	else
 		_pets_header.push_back(std::format("#TEM Mode: Illumination Angle (urad):\t\t{:.2f}\n", CTEMControlManager::GetInstance()->get_illumination_angle()));
+	
+	_pets_header.push_back(std::format("#C1 Lens (A):\t\t{:.4f}\n", CTEMControlManager::GetInstance()->get_C1_lens()));
+	_pets_header.push_back(std::format("#C2 Lens (A):\t\t{:.4f}\n", CTEMControlManager::GetInstance()->get_C1_lens()));
+	_pets_header.push_back(std::format("#C3 Lens (A):\t\t{:.4f}\n", CTEMControlManager::GetInstance()->get_C1_lens()));
+	_pets_header.push_back(std::format("#Objective Lens (A):\t\t{:.4f}\n", CTEMControlManager::GetInstance()->get_C1_lens()));
 
 	_pets_header.push_back(std::format("#Camera Length (mm):\t\t{:.2f}\n", CTEMControlManager::GetInstance()->get_camera_length()));
 	_pets_header.push_back(std::format("#Exposure Time(ms):\t\t{:03d}\n", CTimepix::GetInstance()->m_iExposureTimeDiff));
-	//_pets_header.push_back(std::format("#Average Time per Frame (ms):\t\t{:03d}\n", _average_time)); useful before tcp because of the delay. Now it is not needed anymore
 	_pets_header.push_back(std::format("#Rotation Speed (%):\t\t{:02d}%\n", static_cast<int>(CTEMControlManager::GetInstance()->get_stage_tilt_speed())));
 	_pets_header.push_back(std::format("#Data collection duration (s):\t\t{:.02f}\n",  fabs(pDC->m_fStartingAng - CTEMControlManager::GetInstance()->get_stage_tilt_angle()) / m_fRotationSpeed));
 	_pets_header.push_back(std::format("#Rotation Speed (Deg/s):\t\t{:.02f}\n", m_fRotationSpeed));
@@ -472,8 +476,6 @@ void CPostDataCollection::do_make_pets_header(std::vector<std::string>& _pets_he
 	_pets_header.push_back(std::format("saturationlimit\t11000\n"));
 
 	_pets_header.push_back("imagelist\n");
-
-
 }
 
 

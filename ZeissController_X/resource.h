@@ -121,12 +121,15 @@
 #define IDC_DC_QC_CHANGE_CAMLEN         1112
 #define IDC_DC_QC_CHANGE_BRIGHTNESS     1113
 #define IDC_DC_FINE_CALIB               1114
+#define IDC_DC_CORRECT_CALIBRATION      1114
 #define IDC_DC_BLANK_ROT                1115
 #define IDC_DC_UPDATE_RECORD_INFO       1118
 #define IDC_DC_SAVE_RAW_IMG             1119
 #define IDC_DC_CALIBRATE_DELTA          1120
 #define IDC_DC_CALIBRATION_DELTA        1120
 #define IDC_DC_DELTA_CALIB_LBL          1121
+#define IDC_CHECK1                      1122
+#define IDC_DC_SAVE_LENS_PARAMS         1122
 #define ID_MENU_DATACOLLECTION          32771
 #define ID_MENU_QUIT                    32772
 
@@ -136,7 +139,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        136
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1122
+#define _APS_NEXT_CONTROL_VALUE         1123
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

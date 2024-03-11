@@ -11,7 +11,7 @@ m_fStartingAng(0.f), m_fEndingAng(0.f), m_bAngleBasedTrack(false), m_bImageBased
 m_bContinuousRecord(false), m_fRecordSTEMMagnification(4000.0f), m_fWorkingStageTSpeed(70.0f), m_fWorkingStageXYSpeed(50.0f),
 m_bKeepThreadRunning(false), m_bLinearMovementTrack(false), m_bMoveMouseTest(false), m_bReadjustZValue(false), m_bSingleRun(false), m_bOnDataCollection(false),
 m_bTimeBasedTrack(false), m_bCheckForZHeight(false), m_bWaitAfterRotation(false), m_fEucentricHeightDeltaZ(5.0f), m_fEucentricHeightTiltSteps(10.0f),
-m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCalibrationX(-999.9f), m_fBeamShiftCalibrationY(-999.9f), m_bBeamShiftCalibrated(false), m_bCanStartCollecting(false)
+m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCalibrationX(-999.9f), m_fBeamShiftCalibrationY(-999.9f), m_bBeamShiftCalibrated(false), m_bCanStartCollecting(false), m_bCorrectCalibration(true)
 
 {
 	PRINTD("\t\t\t\tCDataCollection::CDataCollection() - Constructor\n");
@@ -653,6 +653,8 @@ void CDataCollection::display_images_and_create_tracking_data_tem()
 		return;
 	}
 
+
+
 	for (auto& imgVec : m_pZeissDataCollection->m_oImageBasedVec)
 		imgVec._iPosX = imgVec._iPosY = -1;
 
@@ -813,27 +815,10 @@ void CDataCollection::do_beam_shift_at_coordinates(cv::Point2f& _targetPos, cv::
 
 	float toShiftX = curr_ill_x;
 	float toShiftY = curr_ill_y;
-	if (m_bDo_fine_beam_shift_calibration && m_bIs_beam_shift_calibrated_fine)
-	{
-		float debugX = toShiftX + newVecX / m_fBeamShiftCalibrationX;
-		float debugY = toShiftY + newVecY / m_fBeamShiftCalibrationY;
 
-		for (int i = 0; i < m_fine_calib_X_coefficients.rows; i++)
-		{
-			toShiftX += m_fine_calib_X_coefficients.at<double>(i) * std::pow(newVecX, i);
-			toShiftY += m_fine_calib_Y_coefficients.at<double>(i) * std::pow(newVecY, i);
-			
-			printf("coefficient_X%d(%.5f)\ncoefficient_Y%d(%.5f)\n", i, m_fine_calib_X_coefficients.at<double>(i), i, m_fine_calib_Y_coefficients.at<double>(i));
-		}
-		printf("CalibX(%.5f)\n,CalibY(%.5f)\n", m_fBeamShiftCalibrationX, m_fBeamShiftCalibrationY);
-		printf("DebugX(%.5f)\n,DebugbY(%.5f)", debugX, debugY);
-
-	}
-	else
-	{
-		toShiftX += newVecX / m_fBeamShiftCalibrationX;
-		toShiftY += newVecY / m_fBeamShiftCalibrationY;
-	}
+	toShiftX += newVecX / m_fBeamShiftCalibrationX;
+	toShiftY += newVecY / m_fBeamShiftCalibrationY;
+	
 	_ill_shift_vec_final.x = toShiftX;
 	_ill_shift_vec_final.y = toShiftY;
 
@@ -885,27 +870,10 @@ void CDataCollection::do_beam_shift_at_coordinates_optimized(cv::Point2f& _targe
 
 	float toShiftX = m_oDiffractionParams.Illumination_shift_vec().x;
 	float toShiftY = m_oDiffractionParams.Illumination_shift_vec().y;
-	if (m_bDo_fine_beam_shift_calibration && m_bIs_beam_shift_calibrated_fine)
-	{
-		float debugX = toShiftX + newVecX / m_fBeamShiftCalibrationX;
-		float debugY = toShiftY + newVecY / m_fBeamShiftCalibrationY;
-
-		for (int i = 0; i < m_fine_calib_X_coefficients.rows; i++)
-		{
-			toShiftX += m_fine_calib_X_coefficients.at<double>(i) * std::pow(newVecX, i);
-			toShiftY += m_fine_calib_Y_coefficients.at<double>(i) * std::pow(newVecY, i);
-
-			printf("coefficient_X%d(%.5f)\ncoefficient_Y%d(%.5f)\n", i, m_fine_calib_X_coefficients.at<double>(i), i, m_fine_calib_Y_coefficients.at<double>(i));
-		}
-		printf("CalibX(%.5f)\n,CalibY(%.5f)\n", m_fBeamShiftCalibrationX, m_fBeamShiftCalibrationY);
-		printf("DebugX(%.5f)\n,DebugbY(%.5f)", debugX, debugY);
-
-	}
-	else
-	{
-		toShiftX += newVecX / m_fBeamShiftCalibrationX;
-		toShiftY += newVecY / m_fBeamShiftCalibrationY;
-	}
+	
+	toShiftX += newVecX / m_fBeamShiftCalibrationX;
+	toShiftY += newVecY / m_fBeamShiftCalibrationY;
+	
 	_ill_shift_vec_final.x = toShiftX;
 	_ill_shift_vec_final.y = toShiftY;
 
@@ -1040,8 +1008,8 @@ void CDataCollection::do_calibrate_beam_shift_tem()
 
 	m_bBeamShiftCalibrated = true;
 
-	if (m_bDo_fine_beam_shift_calibration)
-		this->fine_beam_shift_calibration();
+	//if (m_bDo_fine_beam_shift_calibration)
+	//	this->fine_beam_shift_calibration();
 }
 
 void CDataCollection::fine_beam_shift_calibration(int order /*= 4*/)
@@ -1775,12 +1743,19 @@ void CDataCollection::do_track_crystal_coordinates()
 			imgName = this->m_sTrackingImgPath + "_probe_Img";
 			idx = 0;
 			m_pZeissControlManager->acquire_tem_image(imgName, idx);
+
 			//imgsInfo._sFileName = imgName;
 			//_initialImgVec.push_back(imgsInfo);
 
 			CImageManager::GetInstance()->display_image_ex(&_initialImgVec, TEM_TRACKING);
 
 			m_oDiffractionParams.RestoreCurrentParameters(PARAM_DIFFRACTION);
+
+			if(m_bCorrectCalibration == false) // In case its true, this will be done in the RestoreCurrentParameters function.
+			{
+				//m_pZeissControlManager->do_calibrate_focus();
+				//m_pZeissControlManager->do_calibrate_magnification();
+			}
 
 		}
 		
@@ -3606,6 +3581,8 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("Bool_ReadjustZ", m_bReadjustZValue);
 	params_to_save.emplace_back("Bool_CheckEucentricHeight", m_bCheckForZHeight);
 	params_to_save.emplace_back("Bool_EnableVariableInterval", m_bVariableRecordSteps);
+	params_to_save.emplace_back("Bool_SaveLensParams", m_pZeissControlManager->m_bSaveLensParams);
+	params_to_save.emplace_back("Bool_CorrectCalibratrion", m_pZeissDataCollection->m_bCorrectCalibration);
 
 	// TEM's State:
 	params_to_save.emplace_back("CALIB_Ill_shift_X", m_fBeamShiftCalibrationX);
@@ -3642,6 +3619,8 @@ std::vector<my_params> CDataCollection::save_parameters()
 	//Searching mode
 	params_to_save.emplace_back("SEARCH_Ill_shift_X", m_oSearchingParams.Illumination_shift_vec().x);
 	params_to_save.emplace_back("SEARCH_Ill_shift_Y", m_oSearchingParams.Illumination_shift_vec().y);
+	params_to_save.emplace_back("SEARCH_Ill_tilt_X", m_oSearchingParams.Illumination_tilt_vec().x);
+	params_to_save.emplace_back("SEARCH_Ill_tilt_Y", m_oSearchingParams.Illumination_tilt_vec().y);
 	params_to_save.emplace_back("SEARCH_Ill_shift_X_lowmag", m_oSearchingParams.Illumination_shift_vec(MAG_MODE::LOW_MAG_MODE_TEM).x);
 	params_to_save.emplace_back("SEARCH_Ill_shift_Y_lowmag", m_oSearchingParams.Illumination_shift_vec(MAG_MODE::LOW_MAG_MODE_TEM).y);
 
@@ -3664,10 +3643,18 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("SEARCH_Spec_Mag_index_lowmag", m_oSearchingParams.Spec_mag_idx(MAG_MODE::LOW_MAG_MODE_TEM));
 	params_to_save.emplace_back("SEARCH_Focus", m_oSearchingParams.get_focus());
 	params_to_save.emplace_back("SEARCH_Focus_lowmag", m_oSearchingParams.get_focus(MAG_MODE::LOW_MAG_MODE_TEM));
+	params_to_save.emplace_back("SEARCH_C1_Lens", m_oSearchingParams.get_current_C1_lens());
+	params_to_save.emplace_back("SEARCH_C2_Lens", m_oSearchingParams.get_current__C2_lens());
+	params_to_save.emplace_back("SEARCH_C3_Lens", m_oSearchingParams.get_current__C3_lens());
+	params_to_save.emplace_back("SEARCH_OBJECTIVE_Lens", m_oSearchingParams.get_current_objective_lens());
+	params_to_save.emplace_back("SEARCH_LensStored", m_oSearchingParams.is_lens_stored());
+
 
 	//Imaging-Tracking mode
 	params_to_save.emplace_back("IMG_Ill_shift_X", m_oImagingParams.Illumination_shift_vec().x);
 	params_to_save.emplace_back("IMG_Ill_shift_Y", m_oImagingParams.Illumination_shift_vec().y); 
+	params_to_save.emplace_back("IMG_Ill_tilt_X", m_oImagingParams.Illumination_tilt_vec().x);
+	params_to_save.emplace_back("IMG_Ill_tilt_Y", m_oImagingParams.Illumination_tilt_vec().y);
 	params_to_save.emplace_back("IMG_Ill_shift_X_lowmag", m_oImagingParams.Illumination_shift_vec(MAG_MODE::LOW_MAG_MODE_TEM).x);
 	params_to_save.emplace_back("IMG_Ill_shift_Y_lowmag", m_oImagingParams.Illumination_shift_vec(MAG_MODE::LOW_MAG_MODE_TEM).y);
 
@@ -3690,10 +3677,17 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("IMG_Spec_Mag_index_lowmag", m_oImagingParams.Spec_mag_idx(MAG_MODE::LOW_MAG_MODE_TEM));
 	params_to_save.emplace_back("IMG_Focus", m_oImagingParams.get_focus());
 	params_to_save.emplace_back("IMG_Focus_lowmag", m_oImagingParams.get_focus(MAG_MODE::LOW_MAG_MODE_TEM));
+	params_to_save.emplace_back("IMG_C1_Lens", m_oImagingParams.get_current_C1_lens());
+	params_to_save.emplace_back("IMG_C2_Lens", m_oImagingParams.get_current__C2_lens());
+	params_to_save.emplace_back("IMG_C3_Lens", m_oImagingParams.get_current__C3_lens());
+	params_to_save.emplace_back("IMG_OBJECTIVE_Lens", m_oImagingParams.get_current_objective_lens());
+	params_to_save.emplace_back("IMG_LensStored", m_oImagingParams.is_lens_stored());
 
 	//Diffraction Mode
 	params_to_save.emplace_back("DIFF_Ill_shift_X", m_oDiffractionParams.Illumination_shift_vec().x);
 	params_to_save.emplace_back("DIFF_Ill_shift_Y", m_oDiffractionParams.Illumination_shift_vec().y);
+	params_to_save.emplace_back("DIFF_Ill_tilt_X", m_oDiffractionParams.Illumination_tilt_vec().x);
+	params_to_save.emplace_back("DIFF_Ill_tilt_Y", m_oDiffractionParams.Illumination_tilt_vec().y);
 	params_to_save.emplace_back("DIFF_Ill_shift_X_to_Screen", m_oDiffractionParams.Illumination_shift_screen_coords().x);
 	params_to_save.emplace_back("DIFF_Ill_shift_Y_to_Screen", m_oDiffractionParams.Illumination_shift_screen_coords().y);
 	params_to_save.emplace_back("DIFF_Img_shift_X", m_oDiffractionParams.Image_shift_vec().x);
@@ -3704,6 +3698,11 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("DIFF_Mag_index", m_oDiffractionParams.Magnification_idx());
 	params_to_save.emplace_back("DIFF_Spec_Mag_index", m_oDiffractionParams.Spec_mag_idx());
 	params_to_save.emplace_back("DIFF_Focus", m_oDiffractionParams.get_focus());
+	params_to_save.emplace_back("DIFF_C1_Lens", m_oDiffractionParams.get_current_C1_lens());
+	params_to_save.emplace_back("DIFF_C2_Lens", m_oDiffractionParams.get_current__C2_lens());
+	params_to_save.emplace_back("DIFF_C3_Lens", m_oDiffractionParams.get_current__C3_lens());
+	params_to_save.emplace_back("DIFF_OBJECTIVE_Lens", m_oDiffractionParams.get_current_objective_lens());
+	params_to_save.emplace_back("DIFF_LensStored", m_oDiffractionParams.is_lens_stored());
 
 	return params_to_save;
 }
@@ -3780,6 +3779,8 @@ void CDataCollection::restore_parameters()
 	pFileWriter->restore_param("Bool_ReadjustZ", m_bReadjustZValue);
 	pFileWriter->restore_param("Bool_CheckEucentricHeight", m_bCheckForZHeight);
 	pFileWriter->restore_param("Bool_EnableVariableInterval", m_bVariableRecordSteps);
+	pFileWriter->restore_param("Bool_SaveLensParams", m_pZeissControlManager->m_bSaveLensParams);
+	pFileWriter->restore_param("Bool_CorrectCalibratrion", m_pZeissDataCollection->m_bCorrectCalibration);
 
 	// TEM's State:
 	pFileWriter->restore_param("CALIB_Ill_shift_X", m_fBeamShiftCalibrationX);
@@ -3876,6 +3877,8 @@ ImgInfoPurpose ImagesInfo::_purpose = STEM_TRACKING;
 float ImagesInfo::_radius = 0.0f;
 float ImagesInfo::_circle_detection_param = 1.0f;
 TEM_SETTING TEMModeParameters::current_parameters = PARAM_SEARCHING;
+
+
 void TEMModeParameters::SaveCurrentParameters()
 {
 	auto zeissControl = CTEMControlManager::GetInstance();
@@ -3893,10 +3896,27 @@ void TEMModeParameters::SaveCurrentParameters()
 		image_shift_vec.x = zeissControl->get_image_shift_x();
 		image_shift_vec.y = zeissControl->get_image_shift_y();
 
+		illumination_tilt_vec.x = zeissControl->get_illumination_tilt_x();
+		illumination_tilt_vec.y = zeissControl->get_illumination_tilt_y();
+		//objective_stig_vec.x = zeissControl->get_objective_stig_x();
+		//objective_stig_vec.y = zeissControl->get_objective_stig_y();
+
 		image_mode = zeissControl->get_image_mode();
 		spec_mag_idx = zeissControl->get_spec_mag_index();
 		focus = zeissControl->get_focus();
 
+
+		if (zeissControl->m_bSaveLensParams == true)
+		{
+			fC1lens = zeissControl->get_C1_lens();
+			fC2lens = zeissControl->get_C2_lens();
+			fC3lens = zeissControl->get_C3_lens();
+			fObjlens = zeissControl->get_objective_lens();
+
+			bLensesStored = true;
+		}
+		else
+			bLensesStored = false; // If we don't store them, or we uncheck the checkbox, we make sure that we don't restore them later on.
 
 	}
 	else {
@@ -3923,6 +3943,7 @@ void TEMModeParameters::SaveCurrentParameters()
  	// IDX 3 FOCUS -0.021
 	// IDX 4 FOCUS 0.00	
 
+
 }
 
 void TEMModeParameters::RestoreCurrentParameters(TEM_SETTING id)
@@ -3930,11 +3951,11 @@ void TEMModeParameters::RestoreCurrentParameters(TEM_SETTING id)
 	if (id == current_parameters)
 		return;
 
-	auto zeissControl = CTEMControlManager::GetInstance();
+	static auto zeissControl = CTEMControlManager::GetInstance();
 	if (zeissControl->is_on_stem_mode() == false)
 	{
 		MAG_MODE mag_mode = zeissControl->get_mag_mode();
-		auto pDC = CDataCollection::GetInstance();
+		static auto pDC = CDataCollection::GetInstance();
 
 		if (id == TEM_SETTING::PARAM_SEARCHING || id == PARAM_IMAGING || id == PARAM_DIFFRACTION) {
 			zeissControl->simulate_mdf(true, this);
@@ -3963,10 +3984,50 @@ void TEMModeParameters::RestoreCurrentParameters(TEM_SETTING id)
 			pDC->do_set_current_illumination_shift_coordinates(illumination_shift_vec.x, illumination_shift_vec.y);
 			zeissControl->set_illumination_shift(illumination_shift_vec.x, illumination_shift_vec.y);
 
-
+			zeissControl->set_illumination_tilt(illumination_tilt_vec.x, illumination_tilt_vec.y);
 
 			// MIS number
 			zeissControl->set_mis_num(aperture_selection_number);
+
+
+			if (zeissControl->m_bSaveLensParams == true)
+			{
+				if (bLensesStored == true) // We wouldn't wanna set the lenses to 0.0 or to anything weird.
+				{
+					if (fC1lens >= 0.0f)
+						zeissControl->set_C1_lens(fC1lens);
+					else
+						printf("C1 lens value is negative, make sure you've had it initialized first.\n");
+
+					std::this_thread::sleep_for(25ms);
+					if (fC2lens >= 0.0f)
+						zeissControl->set_C2_lens(fC2lens);
+					else
+						printf("C2 lens value is negative, make sure you've had it initialized first.\n");
+					std::this_thread::sleep_for(25ms);
+
+					if(fC3lens >= 0.0f)
+						zeissControl->set_C3_lens(fC3lens);
+					else
+						printf("C3 lens value is negative, make sure you've had it initialized first.\n");
+					std::this_thread::sleep_for(25ms);
+
+					if(fObjlens >= 0.0f)
+						zeissControl->set_objective_lens(fObjlens);
+					else
+						printf("OBJ lens value is negative, make sure you've had it initialized first.\n");
+					std::this_thread::sleep_for(125ms);
+
+				}
+			}
+
+			/*if(pDC->m_bCorrectCalibration)
+			{
+				std::this_thread::sleep_for(75ms);
+				zeissControl->do_calibrate_focus();
+				std::this_thread::sleep_for(75ms);
+				zeissControl->do_calibrate_magnification();
+			}*/
 
 			// Focus
 			zeissControl->set_focus(focus);
@@ -4020,7 +4081,9 @@ void TEMModeParameters::restore_param(std::string _customPrefix)
 	auto pWriter = CWriteFile::GetInstance();
 
 	pWriter->restore_param("Ill_shift_X", this->illumination_shift_vec.x, _customPrefix);
-	pWriter->restore_param("Ill_shift_Y", this->illumination_shift_vec.y, _customPrefix);	
+	pWriter->restore_param("Ill_shift_Y", this->illumination_shift_vec.y, _customPrefix);
+	pWriter->restore_param("Ill_tilt_x", this->illumination_tilt_vec.y, _customPrefix);
+	pWriter->restore_param("Ill_tilt_Y", this->illumination_tilt_vec.y, _customPrefix);
 	pWriter->restore_param("Ill_shift_X_lowmag", this->illumination_shift_vec_lowmag.x, _customPrefix);
 	pWriter->restore_param("Ill_shift_Y_lowmag", this->illumination_shift_vec_lowmag.y, _customPrefix);
 	pWriter->restore_param("Ill_shift_X_to_Screen", this->illumination_shift_screen_coords.x, _customPrefix);
@@ -4040,6 +4103,11 @@ void TEMModeParameters::restore_param(std::string _customPrefix)
 	pWriter->restore_param("Spec_Mag_index_lowmag", this->spec_mag_idx_lowmag, _customPrefix);
 	pWriter->restore_param("Focus", this->focus, _customPrefix);
 	pWriter->restore_param("Focus_lowmag", this->focus_lowmag, _customPrefix);
+	pWriter->restore_param("C1_Lens", this->fC1lens, _customPrefix);
+	pWriter->restore_param("C2_Lens", this->fC2lens, _customPrefix);
+	pWriter->restore_param("C3_Lens", this->fC3lens, _customPrefix);
+	pWriter->restore_param("OBJECTIVE_Lens", this->fObjlens, _customPrefix);
+	pWriter->restore_param("LensStored", this->bLensesStored, _customPrefix);
 
 	//CDataCollection::GetInstance()->do_set_current_beam_screen_coordinates(illumination_shift_screen_coords.x, illumination_shift_screen_coords.y);
 }
@@ -4052,6 +4120,12 @@ cv::Point2f TEMModeParameters::Illumination_shift_vec(MAG_MODE _mag_mode /*= MAG
 cv::Point2f TEMModeParameters::Image_shift_vec(MAG_MODE _mag_mode /*= MAG_MODE::MAG_MODE_TEM*/) const
 {
 	return _mag_mode == MAG_MODE::MAG_MODE_TEM ? image_shift_vec : image_shift_vec_lowmag;
+}
+
+cv::Point2f TEMModeParameters::Illumination_tilt_vec(MAG_MODE _mag_mode /*= MAG_MODE::MAG_MODE_TEM*/) const
+{
+	return _mag_mode == MAG_MODE::MAG_MODE_TEM ? illumination_tilt_vec : cv::Point2f(0,0);
+
 }
 
 int TEMModeParameters::Aperture_selection_number() const
@@ -4087,4 +4161,29 @@ float TEMModeParameters::get_focus(MAG_MODE _mag_mode /*= MAG_MODE::MAG_MODE_TEM
 cv::Point2f TEMModeParameters::Illumination_shift_screen_coords() const
 {
 	return illumination_shift_screen_coords;
+}
+
+bool TEMModeParameters::is_lens_stored()
+{
+	return bLensesStored;
+}
+
+float TEMModeParameters::get_current_C1_lens()
+{
+	return fC1lens;
+}
+
+float TEMModeParameters::get_current__C2_lens()
+{
+	return fC2lens;
+}
+
+float TEMModeParameters::get_current__C3_lens()
+{
+	return fC3lens;
+}
+
+float TEMModeParameters::get_current_objective_lens()
+{
+	return fObjlens;
 }

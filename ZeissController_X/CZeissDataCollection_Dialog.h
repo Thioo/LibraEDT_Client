@@ -15,6 +15,7 @@ public:
 
 private:
 	CDataCollection*	 m_pZeissDataCollection;
+	CTEMControlManager*  m_pTEMControlManager;
 	CTimepix*			 m_pTimepix;
 	CZeissQuickControl*  m_pZeissQuickControl;
 

@@ -24,6 +24,8 @@ private:
 	cv::Point2f illumination_shift_vec;
 	cv::Point2f illumination_shift_screen_coords;
 	cv::Point2f image_shift_vec;
+	cv::Point2f illumination_tilt_vec;
+	cv::Point2f objective_stig_vec;
 	int			aperture_selection_number;
 	IMG_MODE    image_mode;
 	float		illumination_idx;
@@ -31,6 +33,11 @@ private:
 	float       spec_mag_idx;
 	float		focus;
 	float		focus_lowmag;
+	bool		bLensesStored;
+	float		fC1lens;
+	float		fC2lens;
+	float		fC3lens;
+	float		fObjlens;
 
 	cv::Point2f illumination_shift_vec_lowmag;
 	cv::Point2f image_shift_vec_lowmag;
@@ -42,7 +49,6 @@ private:
 public:
 	static TEM_SETTING current_parameters;
 
-public:
 
 	void SaveCurrentParameters();
 
@@ -53,12 +59,18 @@ public:
 	// getters
 	cv::Point2f Illumination_shift_vec(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
 	cv::Point2f Image_shift_vec(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
+	cv::Point2f Illumination_tilt_vec(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
+	cv::Point2f Objective_stig_vec(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
 	int Aperture_selection_number() const;
 	IMG_MODE Image_mode(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
 	float Illumination_idx(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
 	float Magnification_idx(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM) const;
 	float Spec_mag_idx(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM);
 	float get_focus(MAG_MODE _mag_mode = MAG_MODE::MAG_MODE_TEM);
+	float get_current_C1_lens();
+	float get_current__C2_lens();
+	float get_current__C3_lens();
+	float get_current_objective_lens();
 
 	cv::Point2f Illumination_shift_screen_coords() const;
 	void set_Illumination_shift_screen_coords(cv::Point2f val) { illumination_shift_screen_coords = val; }
@@ -69,6 +81,7 @@ public:
 	TEMModeParameters() {
 		PRINTD("TEMModeParameters::TEMModeParameters(): To be continued...\n")
 		illumination_idx = illumination_idx_lowmag = 4.0f; // In our microscope, 4 is the minimum value for the illumination that is calibrated.
+		fC1lens = fC2lens = fC3lens = fObjlens = -1.0f; // Initialize them as negative values. The instrument will not allow to set negative values. We can also check beforehand.
 		/*illumination_shift_vec.x = illumination_shift_vec.y = 0.0f;
 		image_shift_vec.x = image_shift_vec.y = 0.0f;
 		aperture_selection_number = 0;
@@ -86,6 +99,7 @@ public:
 		magnification_idx_lowmag = 0.0f;
 		spec_mag_idx_lowmag = 0.0f;*/
 	}
+	bool is_lens_stored();
 };
 
 
@@ -191,7 +205,6 @@ public:
 
 	bool m_bMoveMouseTest;
 	bool m_bReadjustZValue;
-	bool m_bDo_fine_beam_shift_calibration;
 	bool m_bCheckForZHeight;
 	bool m_bWaitAfterRotation;
 	bool m_bDoBlankRotation;
@@ -204,7 +217,9 @@ public:
 	bool m_bOnRecording;
 	bool m_bOnRotateRequest;
 
+
 	int  m_iCalibrationDeltaGUI;
+	bool m_bCorrectCalibration;
 	int  m_iNumOfFramesToTake;
 	TrackingMode  m_iImageBasedTrackingMode;
 	POINT		  m_CorrectSpotPosition;
