@@ -86,7 +86,7 @@ bool CTEMControlManager::PatchLicense()
 	*(BYTE*)(dwTargetAddr) = 0xEB;
 	VirtualProtect((LPVOID)dwTargetAddr, 0x4, dwOld, &dwOld);
 
-	PRINT("API License was successfully patched... Use wisely :)");
+	//PRINT("API License was successfully patched... Use wisely :)");
     return true;
 }
 
