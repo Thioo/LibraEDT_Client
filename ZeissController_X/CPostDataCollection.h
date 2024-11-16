@@ -122,6 +122,7 @@ private:
 	void do_translate_image(cv::Mat& _img, int _offsetX, int _offsetY);
 
 public:
+	static void do_flatfield_correction(cv::Mat& _img_to_correct);
 	static void do_dead_pixels_correction(cv::Mat& _img_to_correct);
 	static void do_cross_correction(cv::Mat& _image_to_correct, cv::Mat& _corrected_image, float _corrFactor = 1.0f, float _midcross_corr = 1.0f);
 	static void do_get_dead_pixels_coordinates();

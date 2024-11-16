@@ -1,9 +1,14 @@
 #include "pch.h"
 #define M_PI       3.14159265358979323846   // pi
+#define _CANVAS_SIZE_ 400
+#define _GRID_MAX_LENGTH 2000.0f
+#define COLOR_GRIDREGION_UNSCANNED cv::Scalar(0, 255, 0)
+#define COLOR_GRIDREGION_SCANNED cv::Scalar(0, 0, 255)
 
 
 
 CDataCollection* CDataCollection::m_pZeissDataCollection = nullptr;
+std::vector<GridRegions> CDataCollection::gridRegions;
 
 
 CDataCollection::CDataCollection() : m_pStage(nullptr), m_pZeissControlManager(nullptr), m_pFile(nullptr),
@@ -11,7 +16,8 @@ m_fStartingAng(0.f), m_fEndingAng(0.f), m_bAngleBasedTrack(false), m_bImageBased
 m_bContinuousRecord(false), m_fRecordSTEMMagnification(4000.0f), m_fWorkingStageTSpeed(70.0f), m_fWorkingStageXYSpeed(50.0f),
 m_bKeepThreadRunning(false), m_bLinearMovementTrack(false), m_bMoveMouseTest(false), m_bReadjustZValue(false), m_bSingleRun(false), m_bOnDataCollection(false),
 m_bTimeBasedTrack(false), m_bCheckForZHeight(false), m_bWaitAfterRotation(false), m_fEucentricHeightDeltaZ(5.0f), m_fEucentricHeightTiltSteps(10.0f),
-m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCalibrationX(-999.9f), m_fBeamShiftCalibrationY(-999.9f), m_bBeamShiftCalibrated(false), m_bCanStartCollecting(false), m_bCorrectCalibration(true)
+m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCalibrationX(-999.9f), m_fBeamShiftCalibrationY(-999.9f), m_bBeamShiftCalibrated(false), m_bCanStartCollecting(false), m_bCorrectCalibration(true), m_bIs2DMapVisible(false), m_bSerialEDScanRegions(false), m_bTrackStageMovement(false)
+
 
 {
 	PRINTD("\t\t\t\tCDataCollection::CDataCollection() - Constructor\n");
@@ -36,6 +42,10 @@ m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCal
 		m_oFirstRegionVec.reserve(20);
 		m_oSecondRegionVec.reserve(20);
 		m_oDiffracctionFrames.reserve(1000); 
+		m_oCrystalPathCoordinates.reserve(100);
+		m_oCrystalPathCoordinatesSwapped.reserve(100);
+		m_oCrystalPathCoordinatesSpline.reserve(500);
+		m_oCrystalPathCoordinatesSwappedSpline.reserve(500);
 		_raw_img_vec.reserve(1000);
 		//_raw_collected_frames.reserve(1000);
 		m_CorrectSpotPosition.x = STEMRESX / 2;
@@ -46,6 +56,10 @@ m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCal
 
 		m_fine_calib_X_coefficients = cv::Mat(6, 1, CV_64F);
 		m_fine_calib_Y_coefficients = cv::Mat(6, 1, CV_64F);
+
+		m_StagePosition2D = cv::Point2f(_CANVAS_SIZE_ / 2, _CANVAS_SIZE_ / 2);
+
+		gridRegions.reserve(100);
 	}
 
 }
@@ -151,6 +165,7 @@ void CDataCollection::do_track_ex()
 
 	if (m_bTrackCrystalPath)
 	{
+		// No longer remember why we're making this call here and not after the recording. Maybe its for the cases where user restarted the program and reloaded the tracking data??
 		do_prepare_data_for_tracking();
 
 		m_bOnTracking = true;
@@ -164,7 +179,7 @@ void CDataCollection::do_track_ex()
 			this->do_tilt_backlash_correction(m_fStartingAng, bPositive);
 			std::this_thread::sleep_for(100ms);
 
-			if (this->is_on_stem_mode())
+			/*if (this->is_on_stem_mode())
 			{
 				//m_pStage->stage_go_to_xy(m_vStartingStagePos.x, m_vStartingStagePos.y);
 
@@ -174,7 +189,7 @@ void CDataCollection::do_track_ex()
 					std::thread t1(&CDataCollection::do_readjust_z_value, this);
 					t1.detach();
 				}
-			}
+			}*/
 			std::thread t(&CDataCollection::do_crystal_tracking_correction, this); // This was for the knoevenagel crystal structure "tracking" by defocusing the beam when space is pressed
 			this->do_track_crystal_coordinates();
 			//std::thread t(&CDataCollection::do_track_crystal_coordinates, this);
@@ -883,7 +898,7 @@ void CDataCollection::do_beam_shift_at_coordinates_optimized(cv::Point2f& _targe
 	}
 }
 
-void CDataCollection::do_beam_shift_at_coordinates_alternative(cv::Point2f& _targetPos, bool bShiftBeam /*= false*/)
+void CDataCollection::do_beam_shift_at_coordinates_alternative(cv::Point2f& _targetPos, bool bShiftBeam /*= false*/, bool bOnUpdate /*= false*/)
 {
 	//PRINT("TESTING (do_beam_shift_at_coordinates_alternative) - USING NEW METHOD FOR BEAM SHIFT - REPORT IF IT FAILS!");
 	cv::Point2f deltaVec = _targetPos - m_oDiffractionParams.Illumination_shift_screen_coords();
@@ -906,7 +921,13 @@ void CDataCollection::do_beam_shift_at_coordinates_alternative(cv::Point2f& _tar
 	shiftY += m_oDiffractionParams.Illumination_shift_vec().y;
 
 	if (bShiftBeam)
+	{
 		m_pZeissControlManager->set_illumination_shift(shiftX, shiftY);
+
+		// Update beam screen coordinates
+		if (bOnUpdate)
+			this->do_set_current_beam_screen_coordinates(_targetPos.x, _targetPos.y, false);
+	}
 
 }
 
@@ -1169,6 +1190,9 @@ cv::Mat CDataCollection::poly_fit(std::vector<cv::Point2f>& points, unsigned int
 	cv::solve(A, b, coeffs, cv::DECOMP_QR);
 	return coeffs;
 }
+
+
+
 
 float CDataCollection::get_beam_calibration_y()
 {
@@ -1502,14 +1526,30 @@ void CDataCollection::do_image_based_record_stem(/*CTimer& _oTimer*/)
 
 void CDataCollection::do_prepare_data_for_tracking()
 {
+	
 	bool bTrackingCorrections = false;
 	m_oTrackingDataVec.clear();
 	
-	if (m_oImageBasedVec.empty() || m_oImageBasedVec[0]._bIsImgValid == false)
+	// Make sure that we have images to prepare the data
+	if (m_oImageBasedVec.empty())
+	{
+		PRINT("No images to prepare the data for tracking!");
 		return;
+	}else if(m_oImageBasedVec[0]._bIsImgValid == false) // No idea why...
+	{
+		// Lets make sure that the user knows that the first image SHOULD be valid. Again, I don't remember why I have this requirement here.
+		PRINT("First image is invalid, cannot prepare the data for tracking!");
+		return;
+	}
 
+
+	// The most important part of this loop (and this function) is to prepare the data so that there are no invalid images in the vector.
+	// Invalid images are those with posx and posy equal to -1.0f (because the user didn't click on the image, maybe because there was no crystal)
+	// So what we do is to ignore those images and connect the previous valid image with the next valid image.
+	// A(valid) ---- B(invalid) ---- C(valid) ====> A -------------- C
 	for (int i = 0; i < m_oImageBasedVec.size(); i++)
 	{
+		// Skip if the image is invalid
 		if(m_oImageBasedVec[i]._bIsImgValid == false)
 			continue;
 
@@ -1532,6 +1572,45 @@ void CDataCollection::do_prepare_data_for_tracking()
 
 		m_oTrackingDataVec.push_back(data);
 	}
+	
+	// I'm curious to see if a spline interpolation would model better the movement of the crystal
+
+	xt::xarray<double> x = xt::zeros<double>({m_oTrackingDataVec.size()});
+	xt::xarray<double> y = xt::zeros_like(x);
+	xt::xarray<double> t = xt::zeros_like(x);
+	
+	auto it_x = x.begin();
+	auto it_y = y.begin();
+	auto it_t = t.begin();
+
+	for (auto& data : m_oTrackingDataVec)
+	{
+		*it_x++ = static_cast<double>(data.crystalCoordinates.x);
+		*it_y++ = static_cast<double>(data.crystalCoordinates.y);
+		*it_t++ = static_cast<double>(data.uiTime);
+	}
+
+	// We want the spline to be a function of time
+	m_oSplineX = this->generate_spline(t, x); // f(t) = x
+	m_oSplineY = this->generate_spline(t, y); // f(t) = y
+
+	xt::xarray<double> new_t = xt::linspace<double>(xt::amin(t)[0], xt::amax(t)[0], 500);
+	m_oSplineInterpX = this->interpolate_spline(m_oSplineX, new_t);
+	m_oSplineInterpY = this->interpolate_spline(m_oSplineY, new_t);
+
+	// Lets construct the coordinates vector as well as the swapped ones
+	xt::xarray<float> XYs = xt::transpose(xt::concatenate(xt::xtuple(m_oSplineInterpX, m_oSplineInterpY)).reshape({ 2, -1 }));
+	m_oCrystalPathCoordinatesSpline.clear();
+	m_oCrystalPathCoordinatesSwappedSpline.clear();
+	auto it = XYs.begin();
+	while (it != XYs.end())
+	{
+		m_oCrystalPathCoordinatesSpline.push_back(cv::Point2f(it[0], it[1]));
+		m_oCrystalPathCoordinatesSwappedSpline.push_back(cv::Point2f(it[1], it[0]));
+		it += 2;
+	}
+
+
 
 	// This identifies outliers and splits the region into multiple parts to simulate an acceleration and deceleration rather than a constant speed from A to B
 	if(bTrackingCorrections) // unusued. 
@@ -1764,7 +1843,8 @@ void CDataCollection::do_track_crystal_coordinates()
 		m_targetPosNew = cv::Point2f(_initialImgVec.at(0)._iPosX, _initialImgVec.at(0)._iPosY);
 		cv::Point2f dummy1, dummy2;
 		if (m_pZeissControlManager->is_on_stem_mode() == false)
-			do_beam_shift_at_coordinates(m_targetPosNew, nullptr, dummy1, dummy2, true);
+			do_beam_shift_at_coordinates_alternative(m_targetPosNew, true);
+			//do_beam_shift_at_coordinates(m_targetPosNew, nullptr, dummy1, dummy2, true);
 		//this->do_set_current_beam_screen_coordinates(_initialImgVec.at(0)._iPosX, _initialImgVec.at(0)._iPosY);
 		else
 			m_pZeissControlManager->set_spot_pos(m_targetPosNew.x, m_targetPosNew.y);
@@ -1818,7 +1898,8 @@ void CDataCollection::do_track_crystal_coordinates()
 	else
 	{
 		if (m_bImageBasedTrack)
-			do_image_based_track_tem(t1_angle, m_iImageBasedTrackingMode);
+			do_image_based_track_tem_spline(t1_angle, m_iImageBasedTrackingMode);
+			//do_image_based_track_tem(t1_angle, m_iImageBasedTrackingMode);
 	}
 
 	m_oTrackingTimer.doEnd();
@@ -2063,6 +2144,7 @@ void CDataCollection::do_fill_image_based_vector_tem(ImagesInfo& oImgInfo, CTime
 
 	oImgInfo._bIsLowMagImg = static_cast<bool>(m_pZeissControlManager->get_mag_mode());
 	oImgInfo._fTEMMagnification = static_cast<float>(std::round(m_pZeissControlManager->get_tem_magnification()));
+	oImgInfo._fZHeightVal = static_cast<float>(std::round(m_pZeissControlManager->get_stage_z()));
 	oImgInfo._sFileName = sFileName;
 	oImgInfo._fImageAngle = m_pStage->get_current_tilt_angle();
 	m_oImageBasedVec.push_back(oImgInfo);
@@ -2275,17 +2357,21 @@ void CDataCollection::do_linear_movement_for_continuous_rec_stem(TrackingMode _M
 void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _Mode)
 {
 	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
+	PRINT("REMOVE LATER: TRY THE SPINE INTERPOLATION METHOD INSTEAD OF THIS LINEAR ONE");
+
 	if (m_oTrackingDataVec.empty())
 		return;
 
 	m_vShiftOffset = m_targetPosNew - m_oTrackingDataVec[0].crystalCoordinates;
 
+	// We loop through the tracking data and move the beam to the target position
 	for (int i = 1; i < m_oTrackingDataVec.size(); i++)
 	{
 		auto now = m_oTrackingTimer.returnElapsed();
 		auto vCurrPos = m_oTrackingDataVec[i - 1].crystalCoordinates;
 		auto vTargPos = m_oTrackingDataVec[i].crystalCoordinates;
 
+		// When the target position is the same as the current position, we skip the iteration and sleep for the appropriate time
 		if(vTargPos == vCurrPos) // fixes the nan error
 		{
 			std::chrono::milliseconds duration(m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime);
@@ -2293,13 +2379,15 @@ void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _M
 			continue;
 		}
 
-		
+		// We correct for the shift offset
 		cv::Point2f _startPos, _targPos;
 		vCurrPos += m_vShiftOffset;
 		vTargPos += m_vShiftOffset;
+
+		// We convert from screen coordinates to beam current.
 		this->do_beam_shift_at_coordinates(vTargPos, nullptr, _startPos, _targPos);
 		
-		CTimer timerDebug;
+		//CTimer timerDebug;
 		if (_Mode == MODE_ANGLE_BASED)
 		{
 			float fStartAng = _t1_angle;
@@ -2322,14 +2410,18 @@ void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _M
 		}
 		else
 		{
+
+			// We calculate the duration of the movement
 			float fMovementDuration = static_cast<float>(m_oTrackingDataVec[i].uiTime) - m_oTrackingDataVec[i - 1].uiTime;
 			
+			// We check if the current time is within the range of the target time
 			if (inRange(m_oTrackingDataVec[i - 1].uiTime, m_oTrackingDataVec[i].uiTime, now, true) == false)
 			{
-				//PRINT("Error@inRange - returned FALSE");
+				// If the current time is greater than the target time, we skip the iteration
 				if (now > m_oTrackingDataVec[i].uiTime)
 					continue;
-				else if (now < m_oTrackingDataVec[i-1].uiTime)
+				// If however the current time is less than the target time, it means that we are ahead of the schedule, so we wait before moving on
+				else if (now < m_oTrackingDataVec[i-1].uiTime) 
 				{
 					PRINT("Error@inRange - timer_now < vTargetPos.timer");
 					std::chrono::milliseconds duration(m_oTrackingDataVec[i - 1].uiTime - now);
@@ -2337,18 +2429,140 @@ void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _M
 				}
 			}
 
-			timerDebug.doStart();
+			//timerDebug.doStart();
+			// For each iteration, we know the starting pos, ending pos, and duration, we can smoothly move the beam to the target position
 			bool bRet = move_to_point_time_based_tem(vCurrPos, vTargPos, fMovementDuration, m_oTrackingDataVec[i - 1].uiTime, now);
 			if (bRet == false)
 			{
 				PRINT("bRet == FALSE");
 				break;
 			}
-			timerDebug.doEnd();
+			//timerDebug.doEnd();
 			
 		}
 		//printf("Tracking Region(%d): record(%d)\ttracking(%d)\n", i, m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime, timerDebug.returnElapsed());
 	}
+}
+
+void CDataCollection::do_image_based_track_tem_spline(float& _t1_angle, TrackingMode _Mode)
+{
+	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
+	if (m_oTrackingDataVec.empty()) // We no longer need this check here for the spline interpolation method. But we keep it here for now, just in case...
+		return;
+
+	while(true)
+	{
+		m_vShiftOffset = m_targetPosNew - m_oTrackingDataVec[0].crystalCoordinates;
+		int iTimerOffset = 0; // Check how we can account for the offset during recording and tracking.
+
+		xt::xarray<double> xnow = xt::xarray<double>(m_oTrackingTimer.returnElapsed() + iTimerOffset);
+
+		// Lets get the interpolated X and Y values. Note that these are in screen coordinates.
+		double interpX = this->interpolate_spline(m_oSplineX, xnow)[0];
+		double interpY = this->interpolate_spline(m_oSplineY, xnow)[0];
+
+		// Lets convert them to a cv::Point2f vector and add the shift offset.
+		cv::Point2f vInterpPos = cv::Point2f(interpX, interpY) + m_vShiftOffset;
+
+		// We calculate and shift the beam to the target position
+		this->do_beam_shift_at_coordinates_alternative(vInterpPos, true);
+
+		std::this_thread::sleep_for(5ms);
+		if(static_cast<unsigned int>(xnow(0)) > m_oTrackingDataVec.back().uiTime)
+			break;
+		if (do_check_for_emergency_exit() || (static_cast<unsigned int>(xnow(0)) > 5000 && m_pStage->is_stage_busy() == false))
+		{
+			PRINT("BREAKING HERE");
+			if (m_pStage->is_stage_busy() == false)
+				PRINT("STAGE IS NOT BUSY...");
+			break;
+		}
+
+	}
+
+
+
+
+
+
+	/*// We loop through the tracking data and move the beam to the target position
+	for (int i = 1; i < m_oTrackingDataVec.size(); i++)
+	{
+		auto now = m_oTrackingTimer.returnElapsed();
+		auto vCurrPos = m_oTrackingDataVec[i - 1].crystalCoordinates;
+		auto vTargPos = m_oTrackingDataVec[i].crystalCoordinates;
+
+		// When the target position is the same as the current position, we skip the iteration and sleep for the appropriate time
+		if (vTargPos == vCurrPos) // fixes the nan error
+		{
+			std::chrono::milliseconds duration(m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime);
+			std::this_thread::sleep_for(duration);
+			continue;
+		}
+
+		// We correct for the shift offset
+		cv::Point2f _startPos, _targPos;
+		vCurrPos += m_vShiftOffset;
+		vTargPos += m_vShiftOffset;
+
+		// We convert from screen coordinates to beam current.
+		this->do_beam_shift_at_coordinates(vTargPos, nullptr, _startPos, _targPos);
+
+		//CTimer timerDebug;
+		if (_Mode == MODE_ANGLE_BASED)
+		{
+			float fStartAng = _t1_angle;
+			float fMovementDuration = fabs(m_oTrackingDataVec[i].fAngle - m_oTrackingDataVec[i - 1].fAngle);
+
+			move_to_point_angle_based(_startPos, _targPos, fMovementDuration);
+			/ *while (oMover.isComplete() == false)
+			{
+				//auto t2 = m_pStage->GetCurrentTAngle(); TODO: COMPARE OLD
+				auto t2 = m_pStage->get_current_tilt_angle() - fStartAng; // NEW
+				auto point = oMover.update(t2 - _t1_angle);
+
+				m_pZeissControlManager->set_illumination_shift(point.x, point.y);
+				_t1_angle = t2;
+				if (do_check_for_emergency_exit() || m_pStage->is_stage_busy() == false)
+					break;
+
+				std::this_thread::sleep_for(25ms);
+			}* /
+		}
+		else
+		{
+
+			// We calculate the duration of the movement
+			float fMovementDuration = static_cast<float>(m_oTrackingDataVec[i].uiTime) - m_oTrackingDataVec[i - 1].uiTime;
+
+			// We check if the current time is within the range of the target time
+			if (inRange(m_oTrackingDataVec[i - 1].uiTime, m_oTrackingDataVec[i].uiTime, now, true) == false)
+			{
+				// If the current time is greater than the target time, we skip the iteration
+				if (now > m_oTrackingDataVec[i].uiTime)
+					continue;
+				// If however the current time is less than the target time, it means that we are ahead of the schedule, so we wait before moving on
+				else if (now < m_oTrackingDataVec[i - 1].uiTime)
+				{
+					PRINT("Error@inRange - timer_now < vTargetPos.timer");
+					std::chrono::milliseconds duration(m_oTrackingDataVec[i - 1].uiTime - now);
+					std::this_thread::sleep_for(duration);
+				}
+			}
+
+			//timerDebug.doStart();
+			// For each iteration, we know the starting pos, ending pos, and duration, we can smoothly move the beam to the target position
+			bool bRet = move_to_point_time_based_tem(vCurrPos, vTargPos, fMovementDuration, m_oTrackingDataVec[i - 1].uiTime, now);
+			if (bRet == false)
+			{
+				PRINT("bRet == FALSE");
+				break;
+			}
+			//timerDebug.doEnd();
+
+		}
+		//printf("Tracking Region(%d): record(%d)\ttracking(%d)\n", i, m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime, timerDebug.returnElapsed());
+	}*/
 }
 
 
@@ -2519,6 +2733,41 @@ void CDataCollection::do_image_based_track_stem(int& _t1_time, float& _t1_angle,
 	}
 }
 
+tinyspline::BSpline CDataCollection::generate_spline(xt::xarray<double>& params, xt::xarray<double>& ys)
+{
+	// Tinyspline lib expects the data this way -> [X0, Y0, X1, Y1, X2, Y2, ..., Xn, Yn]ç
+
+	// We begin by concatenating the x and y arrays into a single array -> [X0, X1, X2, ..., Xn, Y0, Y1, Y2, ..., Yn]
+	// We then reshape it in a 2D array -> [[X0, X1, X2, ..., Xn], [Y0, Y1, Y2, ..., Yn]]
+	xt::xarray<double> xy = xt::concatenate(xt::xtuple(params, ys)).reshape({ -1, static_cast<int>(params.shape()[0]) });
+
+	// Finally, we transpose the array to get the desired format -> [[X0, Y0], [X1, Y1], [X2, Y2], ..., [Xn, Yn]]
+	xy = xt::transpose(xy);
+
+	// We convert the xtensor array to a std::vector -> [X0, Y0, X1, Y1, X2, Y2, ..., Xn, Yn]
+	std::vector<tinyspline::real> points(xy.begin(), xy.end());
+
+	// 2nd Param is dimension of the data, which is 2 in this case
+	tinyspline::BSpline spline = tinyspline::BSpline::
+		interpolateCubicNatural(points, static_cast<int>(xy.shape()[1]));
+	return spline;
+}
+
+xt::xarray<double> CDataCollection::interpolate_spline(tinyspline::BSpline& spline, xt::xarray<double>& targetVals)
+{
+	// We create an empty array with the same shape/size as the targetVal
+	xt::xarray<double> xReturn = xt::zeros_like(targetVals);
+
+	// We iterate over the targetVal and interpolate the x values
+	auto it = xReturn.begin();
+	for (auto v : targetVals)
+	{
+		std::vector<tinyspline::real> result = spline.bisect(v).result(); // [0] is the given x, [1] is the inteprolated y
+		*it++ = result[1];
+	}
+	return xReturn;
+}
+
 bool CDataCollection::move_to_point_time_based(cv::Point2f& _start, cv::Point2f& _end, float _duration_ms, std::chrono::steady_clock::time_point& now)
 {
 	bool bReturn = true;
@@ -2635,23 +2884,7 @@ bool CDataCollection::move_to_point_time_based_stem(cv::Point2f& _startingPos, c
 
 	while (true)
 	{
-		/*if (pTpx->update_beam_pos)
-		{
-			std::unique_lock<std::mutex> lock(pTpx->beam_pos_mtx);
-
-			_startingPos += m_vShiftOffset_rotation;
-			_targetPos += m_vShiftOffset_rotation;
-
-			// update the new shift coordinates
-			this->do_beam_shift_at_coordinates(_startingPos, nullptr, new_start, dummy);
-
-			_end += (new_start - _start);
-			_start = new_start;
-
-			pTpx->update_beam_pos = false;
-			lock.unlock();
-		}*/
-
+	
 		// Calculate the elapsed time
 		float currentTime = static_cast<float>(_currentTime);
 		float elapsedTime = currentTime - static_cast<float>(_startingTime); // ???
@@ -2732,9 +2965,9 @@ bool CDataCollection::move_to_point_angle_based(cv::Point2f& _start, cv::Point2f
 
 bool bKeepLooping = true;
 
-void out_save_image(std::string& _fileName, void* _data)
+void save_image_data_to_disk(std::string& _fileName, void* _data, int imgSize=512)
 {
-	TinyTIFFWriterFile* tiffWriter = TinyTIFFWriter_open(_fileName.c_str(), 16, TinyTIFFWriter_Int, 1, 512, 512, TinyTIFFWriter_Greyscale);
+	TinyTIFFWriterFile* tiffWriter = TinyTIFFWriter_open(_fileName.c_str(), 16, TinyTIFFWriter_Int, 1, imgSize, imgSize, TinyTIFFWriter_Greyscale);
 	if (tiffWriter)
 	{
 		TinyTIFFWriter_writeImage(tiffWriter, _data);
@@ -2793,7 +3026,7 @@ void arrange_frame_and_save(std::string& _fileName, i16* m_pData)
 	}
 
 
-	out_save_image(_fileName, m_pConvertedData);
+	save_image_data_to_disk(_fileName, m_pConvertedData);
 	delete[] m_pConvertedData;
 }
 
@@ -3145,7 +3378,7 @@ void CDataCollection::tcp_do_collect_frames()
 		imgFrame.sFullpath = m_sDatasetPath + imgFrame.sImgName;
 		imgFrame.sDirectory = m_sDatasetPath;
 		imgFrame.fAngle = data.fAngle;
-		out_save_image(imgFrame.sFullpath, &data.data);
+		save_image_data_to_disk(imgFrame.sFullpath, &data.data);
 		m_oDiffracctionFrames.push_back(imgFrame);
 	}
 
@@ -3326,7 +3559,7 @@ void CDataCollection::do_live_stream_collected_frames()
 			minMaxLoc(oLiveCollectedFrame, NULL, &max_val);
 			oLiveCollectedFrame.convertTo(oLiveCollectedFrame, CV_16UC1, 65535.0f / max_val);
 			cv::convertScaleAbs(oLiveCollectedFrame, oLiveCollectedFrame, m_pTimepix->get_contrast() / 100.0f, m_pTimepix->get_brightness());
-			cv::resize(oLiveCollectedFrame, oLiveCollectedFrame, cv::Size(), 1.15, 1.15);
+			cv::resize(oLiveCollectedFrame, oLiveCollectedFrame, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
 
 			if (m_pTimepix->m_bInvertColours)
 				cv::bitwise_not(oLiveCollectedFrame, oLiveCollectedFrame);
@@ -3399,6 +3632,84 @@ void CDataCollection::do_tilt_backlash_correction(float _fTargetAngle, bool _bPo
 
 }
 
+
+cv::Mat adaptiveNormalize2(const cv::Mat& image, double minIntensityThreshold = 500.0, double scaleFactor = 10.0) {
+	double minVal, maxVal;
+	cv::minMaxLoc(image, &minVal, &maxVal);
+
+	cv::Mat normalizedImage;
+	double minEffectiveVal = maxVal * 0.00f;
+
+	if (maxVal - minVal < minIntensityThreshold) {
+		// Low dynamic range case: apply an adaptive scaling factor
+		image.convertTo(normalizedImage, CV_16U, scaleFactor, -minEffectiveVal * scaleFactor);
+	}
+	else {
+		// Normal case: normalize to fit within the 14-bit range
+		image.convertTo(normalizedImage, CV_16U, std::pow(2, 16) / maxVal, -minEffectiveVal * (std::pow(2, 16) / maxVal));
+	}
+
+	return normalizedImage;
+}
+
+
+
+
+void CDataCollection::serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec, unsigned int& imgIndex, unsigned int& validImgCount)
+{
+
+	for (auto& data : _raw_img_vec)
+	{
+		cv::Mat oImage = cv::Mat(512, 512, CV_16U, data.data);
+		cv::Mat crossCorrectImg = cv::Mat::zeros(cv::Size(516, 516), oImage.type());
+		CPostDataCollection::do_flatfield_correction(oImage);
+		CPostDataCollection::do_dead_pixels_correction(oImage);
+		CPostDataCollection::do_cross_correction(oImage, crossCorrectImg);
+		
+		cv::Mat preprocessImg = adaptiveNormalize2(crossCorrectImg);
+		cv::resize(preprocessImg, preprocessImg, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
+		if (is_diffraction_pattern_valid(preprocessImg, m_iSerialED_min_num_peaks, m_fSerialED_dmax, true))
+		{
+			std::string sFileName = m_sDatasetPath + std::format("{:010d}.tiff", imgIndex);
+			save_image_data_to_disk(sFileName, crossCorrectImg.data, 516);
+			validImgCount++;
+			imgIndex++;
+		}
+	}
+
+	img_data_vec.clear();
+	printf("Saved Images: %d out of %d collected images\n", validImgCount, static_cast<int>(m_pTimepix->tcp_store_frames_counter));
+}
+
+bool CDataCollection::is_diffraction_pattern_valid(const cv::Mat&diffractionImg, int num_of_peaks, float d_max, bool bUseGFTT)
+{
+	bool bReturn = true;
+	static CImageManager* m_pImgMgr = CImageManager::GetInstance();
+	static SCameraLengthSettings oCameraLength;
+	static int iLastCameraLength = 0;
+	
+	cv::Point2f centralBeamCoords;
+	bReturn = m_pImgMgr->find_central_beam_position(diffractionImg, centralBeamCoords);
+	if (bReturn == false)
+		return false;
+
+	std::vector<cv::Point2f> detectedPeaks;
+	std::vector<cv::Point2f> rejectedPeaks;
+	if (iLastCameraLength != int(m_fCameraLength))
+	{
+		oCameraLength.UpdateCameraLengthSettings(int(m_fCameraLength));
+		iLastCameraLength = int(m_fCameraLength);
+	}
+
+	//cv::Mat contrastCorrect;
+	//cv::convertScaleAbs(diffractionImg, contrastCorrect, 0.8f * 0.5f * 1.0f / 100.0f, 1.0f);
+	bReturn = m_pImgMgr->detect_diffraction_peaks_cheetahpf8(diffractionImg, centralBeamCoords, oCameraLength.flPixelSize, d_max, detectedPeaks, m_fSerialED_i_sigma, m_fSerialED_peaksize, m_fSerialED_peakthreshold, 4);
+	//bReturn = m_pImgMgr->detect_diffraction_peaks_cheetahpf8(diffractionImg, centralBeamCoords, oCameraLength.flPixelSize, d_max, detectedPeaks, rejectedPeaks, num_of_peaks, m_fSerialED_i_sigma, m_fSerialED_peaksize, m_fSerialED_peakdistance, 4, bUseGFTT);
+	if (bReturn == false || detectedPeaks.size() < num_of_peaks)
+		return false;
+	return bReturn;
+
+}
 
 void CDataCollection::do_save_data_collection_parameters()
 {
@@ -3536,6 +3847,345 @@ bool CDataCollection::do_check_for_emergency_exit(DWORD _dwKey /*= VK_MULTIPLY*/
 }
 
 
+void CDataCollection::onMouse_2DMap(int event, int x, int y, int, void* userdata) {
+	auto* params = static_cast<std::tuple<cv::Mat*, GridRegions*, float*, bool*, cv::Point*>*>(userdata);
+	cv::Mat* canvas = std::get<0>(*params);
+	GridRegions* selection = std::get<1>(*params);
+	float scalingFactor = *std::get<2>(*params);
+	bool* isDragging = std::get<3>(*params);
+	cv::Point2f* stagePosition = &reinterpret_cast<CDataCollection*>(std::get<4>(*params))->m_StagePosition2D;
+
+	if (event == cv::EVENT_LBUTTONDOWN) {
+		// Start drawing the selection rectangle
+		*isDragging = true;
+		selection->stage_z = CTEMControlManager::GetInstance()->get_stage_z();
+		selection->gridRegion = cv::Rect(x, y, 0, 0);
+	}
+	else if (event == cv::EVENT_RBUTTONDOWN) {
+		// Check if clicked inside any existing region to delete it
+		for (auto it = gridRegions.begin(); it != gridRegions.end(); ++it) {
+			if (it->gridRegion.contains(cv::Point(x, y))) {
+				gridRegions.erase(it);
+				// Update the display immediately after deletion
+				cv::Mat tempCanvas = canvas->clone();
+				for (const auto& region : gridRegions) {
+						cv::rectangle(tempCanvas, region.gridRegion, region.isRegionScanned ? COLOR_GRIDREGION_SCANNED : COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
+					
+
+				}
+				// Draw the current stage position
+				cv::circle(tempCanvas, *stagePosition, 5, cv::Scalar(255, 0, 0), -1, cv::LINE_AA); // Blue circle for stage position
+				cv::imshow("TEM Stage Map", tempCanvas);
+				return;
+			}
+		}
+
+	}
+	else if (event == cv::EVENT_MBUTTONDBLCLK)
+	{
+		gridRegions.clear();
+	}
+	else if (event == cv::EVENT_MOUSEMOVE) {
+		if (*isDragging) {
+			// Update the size of the selection rectangle
+			selection->gridRegion.width = x - selection->gridRegion.x;
+			selection->gridRegion.height = y - selection->gridRegion.y;
+
+			// Draw the current selection on a temporary canvas
+			cv::Mat tempCanvas = canvas->clone();
+			for (const auto& region : gridRegions) {
+				cv::rectangle(tempCanvas, region.gridRegion, region.isRegionScanned ? COLOR_GRIDREGION_SCANNED : COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
+			}
+			cv::rectangle(tempCanvas, selection->gridRegion, COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
+			// Draw the current stage position
+			cv::circle(tempCanvas, *stagePosition, 5, cv::Scalar(255, 0, 0), -1, cv::LINE_AA); // Blue circle for stage position
+			cv::imshow("TEM Stage Map", tempCanvas);
+		}
+	}
+	else if (*isDragging == true && event == cv::EVENT_LBUTTONUP) {
+		// Finish drawing the selection rectangle
+		*isDragging = false;
+
+		if (selection->gridRegion.width != 0 && selection->gridRegion.height != 0) {
+			// Add the selection to the list of regions
+
+			gridRegions.push_back(*selection);
+
+			// Calculate the corresponding stage coordinates (adjusted for the coordinate system)
+			float startStageX = (selection->gridRegion.x - canvas->cols / 2) / scalingFactor;
+			float endStageX = (selection->gridRegion.x + selection->gridRegion.width - canvas->cols / 2) / scalingFactor;
+			float startStageY = (canvas->rows / 2 - selection->gridRegion.y) / scalingFactor;
+			float endStageY = (canvas->rows / 2 - (selection->gridRegion.y + selection->gridRegion.height)) / scalingFactor;
+
+			// Print stage coordinates to the console
+			//std::cout << "Selected Area Stage Coordinates: Start X = " << startStageX << " um, End X = " << endStageX
+				//<< " um, Start Y = " << startStageY << " um, End Y = " << endStageY << " um" << std::endl;
+		}
+	}
+	else if (event == cv::EVENT_LBUTTONDBLCLK) {
+		// Move the stage to the clicked coordinates (adjusted for the coordinate system)
+		float stageX = (x - canvas->cols / 2) / scalingFactor;
+		float stageY = (canvas->rows / 2 - y) / scalingFactor;
+		std::cout << "Moving to Stage Coordinates: X = " << stageX << " um, Y = " << stageY << " um" << std::endl;
+		m_pZeissDataCollection->m_pStage->stage_go_to_xy(stageX, stageY);
+
+
+	}
+}
+
+void CDataCollection::display_2d_map() {
+	std::string windowName = "TEM Stage Map";
+
+	// Static part: Create an empty image to represent the TEM stage
+	int canvasSize = _CANVAS_SIZE_; // Size of the canvas in pixels
+
+	cv::Mat canvas = cv::Mat::zeros(canvasSize, canvasSize, CV_8UC3);
+	canvas.setTo(cv::Scalar(200, 200, 200)); // gray background
+
+	// Calculate the scaling factor to fit the stage movement limit within the canvas
+	float scalingFactor = static_cast<float>(canvasSize) / _GRID_MAX_LENGTH; // 2000um is the stage movement limit
+
+	// Define the center and radius for the circle representing the stage movement limit
+	cv::Point center(canvasSize / 2, canvasSize / 2);
+	int radius = static_cast<int>(_GRID_MAX_LENGTH * 0.5f * scalingFactor);  // Scale radius to fit within the new canvas size
+
+	// Draw the circle representing the stage movement limit
+	cv::circle(canvas, center, radius, cv::Scalar(0, 0, 200), 2, cv::LINE_AA); // Red circle
+
+	// Draw grid lines every 100um, scaled to fit the canvas
+	int gridSpacing = static_cast<int>(100 * scalingFactor);
+	for (int i = gridSpacing; i < canvasSize; i += gridSpacing) {
+		// Vertical lines
+		int thickness = (i == canvasSize / 2) ? 3 : 2; // Thicker line for the middle cross
+		cv::line(canvas, cv::Point(i, 0), cv::Point(i, canvasSize), cv::Scalar(50, 50, 50), thickness, cv::LINE_AA);
+		// Horizontal lines
+		cv::line(canvas, cv::Point(0, i), cv::Point(canvasSize, i), cv::Scalar(50, 50, 50), thickness, cv::LINE_AA);
+	}
+
+	cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE); // Use WINDOW_AUTOSIZE to maintain size without resizing
+	cv::moveWindow(windowName, 0, -1024);
+#ifdef _DEBUGGING_
+	cv::moveWindow(windowName, 0, 0);
+#endif
+
+	// Variables for interaction
+	GridRegions selection;
+	bool isDragging = false;
+
+	auto params = std::make_tuple(&canvas, &selection, &scalingFactor, &isDragging, this);
+	cv::setMouseCallback(windowName, onMouse_2DMap, &params);
+
+	// Dynamic part: Wait for user input to toggle the map display or exit
+	m_bIs2DMapVisible = true;
+	// Draw the current stage position
+	while (m_bIs2DMapVisible) {
+		cv::Mat tempCanvas = canvas.clone();
+		for (const auto& region : gridRegions) {
+			cv::rectangle(tempCanvas, region.gridRegion, region.isRegionScanned ? COLOR_GRIDREGION_SCANNED : COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
+		}
+		if (isDragging && (selection.gridRegion.width != 0 || selection.gridRegion.height != 0)) {
+			cv::rectangle(tempCanvas, selection.gridRegion, COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
+		}
+
+
+		m_StagePosition2D = get_2d_stage_coordinates(m_pStage->get_stage_x(), m_pStage->get_stage_y());
+		cv::circle(tempCanvas, m_StagePosition2D, 5, cv::Scalar(255, 0, 0), -1, cv::LINE_AA); // Blue circle for stage position
+
+
+		cv::imshow(windowName, tempCanvas);
+		auto q = cv::waitKey(100);
+		if (q == 'q' || q == 'Q') {
+			m_bIs2DMapVisible = false;
+			break;
+		}
+	}
+
+	cv::destroyWindow(windowName);
+}
+
+
+void CDataCollection::do_serial_ed_regions_scan() {
+	// Iterate over each selected region and perform zigzag scanning
+
+	float scalingFactor = static_cast<float>(_CANVAS_SIZE_) / _GRID_MAX_LENGTH; // 2000um is the stage movement limit
+	unsigned int validImgCount = 0;
+	m_pTimepix->tcp_store_frames_counter = 0;
+
+
+	unsigned int imgIndex = 0;
+	for (const auto& entry : std::filesystem::directory_iterator(m_sDatasetPath))
+	{
+		if (entry.path().extension() == ".tiff")
+			imgIndex++;
+	}
+
+	int iRegionID = -1;
+	
+	bool bBreakScan = false;
+	for (auto& region : gridRegions) {
+		iRegionID++;
+
+		if (region.isRegionScanned)
+			continue;
+
+		printf("\tStarting Region [%d] out of [%d]\n", iRegionID, gridRegions.size());
+		// Calculate the starting and ending stage coordinates (adjusted for the coordinate system)
+		int startX = static_cast<int>((region.gridRegion.x - _CANVAS_SIZE_ * 0.5f) / scalingFactor);
+		int endX = static_cast<int>((region.gridRegion.x + region.gridRegion.width - _CANVAS_SIZE_ * 0.5f) / scalingFactor);
+		int startY = static_cast<int>((_CANVAS_SIZE_ * 0.5f - region.gridRegion.y) / scalingFactor);
+		int endY = static_cast<int>((_CANVAS_SIZE_ * 0.5f - (region.gridRegion.y + region.gridRegion.height)) / scalingFactor);
+
+		printf("StartX: %d um - StartY: %d um\nEndX: %d um - EndY: %d um\n\n", startX, startY, endX, endY);
+
+		// Let's move the stage to the top left of the region and wait a bit until the stage is no longer busy/moving.
+		m_pZeissControlManager->do_blank_beam(true);
+		m_pZeissDataCollection->m_pStage->stage_go_to_xy(startX, startY);
+
+		while (m_pZeissDataCollection->m_pStage->is_stage_busy())
+			std::this_thread::sleep_for(500ms);
+
+		m_pZeissControlManager->do_blank_beam(false);
+		std::this_thread::sleep_for(50ms);
+
+		bool moveRight = true;
+
+		for (float y = startY; y >= endY; y -= m_fSerialED_ysteps) {
+
+			if(bBreakScan)
+				break;
+
+			m_pTimepix->tcp_store_diffraction_images = true;
+			if (moveRight) {
+
+				float fCurrentStageX = startX;
+				
+				m_StagePosition2D.x = region.gridRegion.x + region.gridRegion.width;
+
+				while (int(std::round(fCurrentStageX)) != int(std::round(endX)))
+				{
+					m_pZeissDataCollection->m_pStage->stage_go_to_x(endX);
+					while (m_pZeissDataCollection->m_pStage->is_stage_busy()) // As long as the stage is busy, we're good. If I'm not mistaken, the stage will be busy until it reaches the desired position
+					{
+						bBreakScan = do_check_for_emergency_exit();
+						std::this_thread::sleep_for(1000ms);
+
+						if(bBreakScan)
+							break;
+					}
+
+
+					if (m_pTimepix->tcp_store_diffraction_images == false) // If we're here, it's because we've stored more than the fixed number of images in the vector.
+					{
+
+						serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+						_raw_img_vec.clear();
+						m_pTimepix->tcp_store_diffraction_images = true;
+
+					}
+
+					fCurrentStageX = m_pZeissDataCollection->m_pStage->get_stage_x();
+					if(bBreakScan)
+						break;
+				}
+				m_pTimepix->tcp_store_diffraction_images = false;
+				serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+				_raw_img_vec.clear();
+
+				if (bBreakScan)
+					break;
+			}
+			else {
+				
+				float fCurrentStageX = endX;
+
+				while (int(std::round(fCurrentStageX)) != int(std::round(startX)))
+				{
+					m_pZeissDataCollection->m_pStage->stage_go_to_x(startX);
+					while (m_pZeissDataCollection->m_pStage->is_stage_busy()) // As long as the stage is busy, we're good. If I'm not mistaken, the stage will be busy until it reaches the desired position
+					{
+						bBreakScan = do_check_for_emergency_exit();
+						std::this_thread::sleep_for(1000ms);
+						if (bBreakScan)
+							break;
+					}
+
+
+					if (m_pTimepix->tcp_store_diffraction_images == false) // If we're here, it's because we've stored more than the fixed number of images in the vector.
+					{
+
+						serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+						_raw_img_vec.clear();
+						m_pTimepix->tcp_store_diffraction_images = true;
+
+					}
+
+					fCurrentStageX = m_pZeissDataCollection->m_pStage->get_stage_x();
+					if (bBreakScan)
+						break;
+				}
+				m_pTimepix->tcp_store_diffraction_images = false;
+				serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+				
+				if (bBreakScan)
+					break;
+			}
+			moveRight = !moveRight;
+			
+
+			m_pTimepix->tcp_store_diffraction_images = false;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			m_pZeissDataCollection->m_pStage->stage_go_to_y(y); 
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+			while (m_pZeissDataCollection->m_pStage->is_stage_busy())
+				std::this_thread::sleep_for(500ms);
+
+
+				if (m_bSerialEDScanRegions == false)
+					break;
+		}
+
+
+		if (m_bSerialEDScanRegions == false || bBreakScan)
+		{
+			m_pTimepix->tcp_store_diffraction_images = false;
+			serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+			break;
+		}
+
+		region.isRegionScanned = true;
+
+		CWriteFile::GetInstance()->write_params_file(); // update the params file
+
+	}
+
+
+	m_pZeissControlManager->stage_abort_exec();
+	m_pZeissControlManager->do_blank_beam(true);
+	m_bSerialEDScanRegions = false;
+	m_bEnable_items = true;
+	if(!bBreakScan)
+		gridRegions.clear();
+	PRINT("SERIAL_ED_SCAN_REGION FINISHED");
+}
+
+
+cv::Point CDataCollection::get_2d_stage_coordinates(float _stage_x, float _stage_y)
+{
+	// float startStageX = (selection->x - canvas->cols / 2) / scalingFactor;
+
+	float scalingFactor = static_cast<float>(_CANVAS_SIZE_) / _GRID_MAX_LENGTH;
+
+	m_StagePosition2D.x = _stage_x * scalingFactor + _CANVAS_SIZE_ * 0.5f;
+	m_StagePosition2D.y = _CANVAS_SIZE_ * 0.5f - _stage_y * scalingFactor;
+
+	return m_StagePosition2D;
+}
+
+
+
+
+
 bool CDataCollection::is_on_stem_mode()
 {
 	return m_pZeissControlManager->is_on_stem_mode();
@@ -3567,6 +4217,14 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("EucentricHeightDeltaZ", m_fEucentricHeightDeltaZ);
 	params_to_save.emplace_back("ImageBasedTrackingSteps", m_fRecordImgSteps);
 	params_to_save.emplace_back("ImageBasedTrackingStepsVariable", m_fRecordImgStepsVariable);
+
+	// Info on the SerialED Section:
+	params_to_save.emplace_back("SerialED_YSteps", m_fSerialED_ysteps);
+	params_to_save.emplace_back("SerialED_DMin", m_fSerialED_dmax);
+	params_to_save.emplace_back("SerialED_SepMin", m_fSerialED_peakthreshold);
+	params_to_save.emplace_back("SerialED_I_Sigma", m_fSerialED_i_sigma);
+	params_to_save.emplace_back("SerialED_PeakSize", m_fSerialED_peaksize);
+	params_to_save.emplace_back("SerialED_MinPeaks", m_iSerialED_min_num_peaks);
 
 	//params_to_save.emplace_back("Bool_ContinuousRecord", m_bContinuousRecord);
 	params_to_save.emplace_back("Bool_ImageBasedRecord", m_bImageBasedRecord);
@@ -3704,6 +4362,25 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("DIFF_OBJECTIVE_Lens", m_oDiffractionParams.get_current_objective_lens());
 	params_to_save.emplace_back("DIFF_LensStored", m_oDiffractionParams.is_lens_stored());
 
+
+	// SERIAL_ED GRID REGIONS
+	int gridRegionsSize = gridRegions.size();
+	params_to_save.emplace_back("SERIALED_GRIDREGIONS_SIZE", gridRegionsSize);
+	for (int i = 0; i < gridRegionsSize; i++)
+	{
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_X", gridRegions[i].gridRegion.x);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_Y", gridRegions[i].gridRegion.y);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_WIDTH", gridRegions[i].gridRegion.width);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_HEIGHT", gridRegions[i].gridRegion.height);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "IS_REGION_SCANNED", gridRegions[i].isRegionScanned);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_ANGLE", gridRegions[i].angle);
+		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_STAGE_Z", gridRegions[i].stage_z);
+	}
+
+
+
+
+
 	return params_to_save;
 }
 
@@ -3714,6 +4391,12 @@ std::vector<my_params> CDataCollection::save_tracking_data()
 	std::vector<my_params> params_to_save;
 	int iSize = m_oImageBasedVec.size();
 	params_to_save.emplace_back("DATA_SIZE", iSize);
+
+	params_to_save.emplace_back("ROTATION_SPEED", m_pZeissControlManager->get_stage_tilt_speed());
+	params_to_save.emplace_back("STAGE_POS_X", m_pZeissControlManager->get_stage_x() * 1000000.0f);
+	params_to_save.emplace_back("STAGE_POS_Y", m_pZeissControlManager->get_stage_y() * 1000000.0f);
+	params_to_save.emplace_back("STAGE_POS_Z", m_pZeissControlManager->get_stage_z() * 1000000.0f);
+
 
 	for (int i = 0; i < iSize; i++)
 	{
@@ -3766,6 +4449,14 @@ void CDataCollection::restore_parameters()
 	pFileWriter->restore_param("ImageBasedTrackingSteps", m_fRecordImgSteps);
 	pFileWriter->restore_param("ImageBasedTrackingStepsVariable", m_fRecordImgStepsVariable);
 
+	// Info on the SerialED Section:
+	pFileWriter->restore_param("SerialED_YSteps", m_fSerialED_ysteps);
+	pFileWriter->restore_param("SerialED_DMin", m_fSerialED_dmax);
+	pFileWriter->restore_param("SerialED_SepMin", m_fSerialED_peakthreshold);
+	pFileWriter->restore_param("SerialED_I_Sigma", m_fSerialED_i_sigma);
+	pFileWriter->restore_param("SerialED_PeakSize", m_fSerialED_peaksize);
+	pFileWriter->restore_param("SerialED_MinPeaks", m_iSerialED_min_num_peaks);
+
 	//pFileWriter->restore_param("Bool_ContinuousRecord", m_bContinuousRecord);
 	pFileWriter->restore_param("Bool_ImageBasedRecord", m_bImageBasedRecord);
 	//pFileWriter->restore_param("Bool_TimeBasedTrack", m_bTimeBasedTrack);
@@ -3815,6 +4506,23 @@ void CDataCollection::restore_parameters()
 	m_oSearchingParams.restore_param("SEARCH_");
 	m_oImagingParams.restore_param("IMG_");
 	m_oDiffractionParams.restore_param("DIFF_");
+
+
+	int gridRegionsSize = 0;
+	pFileWriter->restore_param("SERIALED_GRIDREGIONS_SIZE", gridRegionsSize);
+	gridRegions.clear();
+	for (int i = 0; i < gridRegionsSize; i++)
+	{
+		GridRegions gridRegion;
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_X", gridRegion.gridRegion.x);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_Y", gridRegion.gridRegion.y);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_WIDTH", gridRegion.gridRegion.width);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_HEIGHT", gridRegion.gridRegion.height);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "IS_REGION_SCANNED", gridRegion.isRegionScanned);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_ANGLE", gridRegion.angle);
+		pFileWriter->restore_param(std::to_string(i) + "_" + "GRID_STAGE_Z", gridRegion.stage_z);
+		gridRegions.push_back(gridRegion);
+	}
 }
 
 void CDataCollection::restore_tracking_data()
@@ -3857,6 +4565,7 @@ void CDataCollection::restore_tracking_data()
 		m_oImageBasedVec.push_back(imgInf);
 	}
 	do_fill_crystal_coordinates_vec();
+	do_prepare_data_for_tracking();
 }
 
 CDataCollection* CDataCollection::GetInstance()
@@ -3870,6 +4579,20 @@ CDataCollection* CDataCollection::GetInstance()
 	//return m_pZeissDataCollection ? m_pZeissDataCollection : new CDataCollection();
 }
 
+
+
+void CDataCollection::prepare_for_2d_map()
+{
+	std::thread tCreate2DMap(&CDataCollection::display_2d_map, this);
+	tCreate2DMap.detach();
+
+}
+
+void CDataCollection::prepare_for_serialed_regions_scan()
+{
+	std::thread tScanMapRegions(&CDataCollection::do_serial_ed_regions_scan, this);
+	tScanMapRegions.detach();
+}
 
 
 bool ImagesInfo::_bSuccess = false;

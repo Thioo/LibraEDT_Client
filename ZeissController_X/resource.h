@@ -95,6 +95,11 @@
 #define IDC_DC_QC_SPEED_40              1083
 #define IDC_DC_QC_SPEED_71              1084
 #define IDC_DC_QC_SPEED_20              1084
+#define IDC_DC_QC_SPEEDXY_80            1085
+#define IDC_DC_QC_SPEEDXY_50            1086
+#define IDC_DC_QC_SPEEDXY_20            1087
+#define IDC_DC_QC_SPEED_21              1088
+#define IDC_DC_QC_SPEEDXY_5             1088
 #define IDC_DC_CALIB_BEAM               1089
 #define IDC_DC_IMG_EXPTIME              1091
 #define IDC_DC_IMG_GAIN                 1092
@@ -130,6 +135,24 @@
 #define IDC_DC_DELTA_CALIB_LBL          1121
 #define IDC_CHECK1                      1122
 #define IDC_DC_SAVE_LENS_PARAMS         1122
+#define IDC_CHECK2                      1124
+#define IDC_DC_CB_LIVEFFT               1124
+#define IDC_DC_QC_2DRadar               1125
+#define IDC_DC_NUMREGIONS               1126
+#define IDC_DC_SERIALEDDURATION         1127
+#define IDC_DC_SCANREGIONS              1128
+#define IDC_DC_TRACKSTAGE_CHCKBTN       1129
+#define IDC_DC_CB_SHOWRINGS             1130
+#define IDC_DC_CB_SHOWPEAKS             1131
+#define IDC_DC_SERIALED_DMAX            1132
+#define IDC_DC_SERIALED_YSTEPS          1133
+#define IDC_DC_SERIALED_MINPEAKS        1134
+#define IDC_DC_SERIALED_QUALITYLEVEL    1135
+#define IDC_DC_SERIALED_THRESHOLD_OR_PEAKDISTANCE    1135
+#define IDC_DC_SERIALED_ADDFOVTOREGION  1136
+#define IDC_DC_SERIALED_CAPTUREREGIONSFROMIMAGE 1137
+#define IDC_DC_SERIALED_PEAKSIZE        1138
+#define IDC_DC_SERIALED_I_SIGMA         1139
 #define ID_MENU_DATACOLLECTION          32771
 #define ID_MENU_QUIT                    32772
 
@@ -139,7 +162,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        136
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1123
+#define _APS_NEXT_CONTROL_VALUE         1137
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

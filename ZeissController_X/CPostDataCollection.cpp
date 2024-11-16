@@ -54,8 +54,6 @@ bool CPostDataCollection::do_load_flatfield_image()
 {
 	if (m_flatfield_image.empty())
 	{
-
-	//	m_flatfield_image = cv::imread("Flatfield/Flatfield.tiff", cv::IMREAD_UNCHANGED);
 		m_flatfield_image = cv::imread("Flatfield/Flatfield.tiff", cv::IMREAD_UNCHANGED);
 
 		if (m_flatfield_image.empty())
@@ -136,7 +134,7 @@ void CPostDataCollection::do_flatfield_and_cross_correction()
 		do_make_xds_file();
 
 		//if (m_bDeleteRAWData)
-			delete_files_in_directory(m_collected_frames->back().sDirectory, "tiff");
+		delete_files_in_directory(m_collected_frames->back().sDirectory, "tiff");
 	}
 }
 
@@ -169,8 +167,19 @@ void CPostDataCollection::do_make_smv_header(float _phi, float _osc_start, float
 	header_file_SMV.push_back(std::format("BEAM_CENTER_X={:.2f};\n", _beam_center_X));
 	header_file_SMV.push_back(std::format("BEAM_CENTER_Y={:.2f};\n", _beam_center_Y));
 	header_file_SMV.push_back(std::format("DENZO_X_BEAM={:.2f};\n", _beam_center_X * 0.055f));
-	header_file_SMV.push_back(std::format("DENZO_Y_BEAM={:.2f};\n", _beam_center_Y * 0.055f));
+	header_file_SMV.push_back(std::format("DENZO_Y_BEAMf={:.2f};\n", _beam_center_Y * 0.055f));
 	header_file_SMV.push_back("}"); //end
+}
+
+void CPostDataCollection::do_flatfield_correction(cv::Mat& _img_to_correct)
+{
+	if (do_load_flatfield_image())
+	{
+		_img_to_correct.convertTo(_img_to_correct, CV_32F);
+		m_flatfield_image.convertTo(m_flatfield_image, CV_32F);
+		_img_to_correct = _img_to_correct * static_cast<float>(cv::mean(m_flatfield_image)[0]) / m_flatfield_image;
+		_img_to_correct.convertTo(_img_to_correct, CV_16U);
+	}
 }
 
 void CPostDataCollection::do_dead_pixels_correction(cv::Mat& _img_to_correct)
@@ -311,8 +320,8 @@ void CPostDataCollection::do_make_cross_corrected_tiff_files(std::set<std::strin
 
 	auto fileloc = *_raw_images_set.begin();
 	auto firstimg = cv::imread(fileloc);
-	do_find_central_beam_coordinates(firstimg, m_shift_all_centers_to);
-	printf("All SMV images will be translated so that the central beam coordinates will be: (%d, %d)", m_shift_all_centers_to.x, m_shift_all_centers_to.y);
+	//do_find_central_beam_coordinates(firstimg, m_shift_all_centers_to);
+	//printf("All SMV images will be translated so that the central beam coordinates will be: (%d, %d)", m_shift_all_centers_to.x, m_shift_all_centers_to.y);
 	int iCounter = -1;
 	for (auto& _image_to_correct : _raw_images_set)
 	{
@@ -444,6 +453,7 @@ void CPostDataCollection::do_make_pets_header(std::vector<std::string>& _pets_he
 	_pets_header.push_back(std::format("#Rotation Speed (Deg/s):\t\t{:.02f}\n", m_fRotationSpeed));
 	_pets_header.push_back(std::format("#Oscillation Range (Deg):\t\t{:.02f}\n", m_fOscRange));
 
+	_pets_header.push_back(std::format("#Condenser Aperture (MIS Number):\t\t{}\n", m_pZeissDataCollection->m_oDiffractionParams.Aperture_selection_number()));
 	_pets_header.push_back(std::format("#Starting Angle: (Deg):\t\t{:.02f}\n", pDC->m_fStartingAng));
 	_pets_header.push_back(std::format("#Ending Angle (Deg):\t\t{:.02f}\n", CTEMControlManager::GetInstance()->get_stage_tilt_angle()));
 	_pets_header.push_back(std::format("#StageX (um):\t\t{:.02f}\n", CTEMControlManager::GetInstance()->get_stage_x() * 1000000.0f));

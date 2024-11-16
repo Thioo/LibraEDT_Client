@@ -7,7 +7,9 @@ public:
 	CZeissStage*		m_pZeissStage;
 	CTimer				m_oTimer;
 	bool				m_bUpdateData;
+	bool				m_bIsSTEM;
 	MAG_MODE			m_magMode;
+	IMG_MODE			m_imgMode;
 
 
 	

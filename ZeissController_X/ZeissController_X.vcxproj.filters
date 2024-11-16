@@ -183,6 +183,9 @@
     <ClInclude Include="CPostDataCollection.h">
       <Filter>My Headers\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Cheetah_PeakFinder.h">
+      <Filter>My Headers\Utilities</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -225,6 +228,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Windows_Linux_Client_Server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Cheetah_PeakFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

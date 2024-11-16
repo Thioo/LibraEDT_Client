@@ -53,6 +53,11 @@ class CTimepix
 	float						m_fBrightness;
 	float						m_fContrast;
 
+	std::mutex					m_fft_mtx;
+	std::condition_variable		m_fft_cv;
+
+	cv::Mat						m_fft_image;
+
 public:
 	MpxModule* m_pRelaxdModule; //TODO: Make Private later
 	std::vector<cv::Point2f>	m_vTargetBeamCoords;
@@ -67,6 +72,12 @@ public:
 	float				m_fBrightnessImg;
 	float				m_fContrastImg;
 	bool				m_bInvertColours;
+	bool				m_bShowResolutionRings;
+	bool				m_bShowPeaks;
+	bool				m_bLiveFFT;
+	bool				m_fft_update_needed;
+	bool				m_stop_fft_thread;
+
 
 	bool is_relaxd_module_initialized() const { return m_bRelaxdInitialized; }
 	void RelaxdInitialized(bool val) { m_bRelaxdInitialized = val; }
@@ -107,6 +118,10 @@ public:
 	void tcp_rotate_and_flip_image(cv::Mat& img);
 	void tcp_prepare_for_live_stream();
 
+	void tcp_fft_thread_function();
+	void tcp_update_fft_image(cv::Mat image);
+
+
 public:
 	~CTimepix();
 	static CTimepix* GetInstance();
@@ -118,7 +133,7 @@ private:
 	CTimepix();
 	void prepare_for_NAT();
 	void initialize_Relaxd_module();
-	void save_image(std::string& _fileName, const void* _data, uint32_t iSize = 512);
+	void save_image(std::string&_fileName, const void*_data, uint32_t iSize = 512, uint16_t type = 16);
 	void grab_image_live_stream();
 	void stream_image_live_stream();
 

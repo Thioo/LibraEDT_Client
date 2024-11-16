@@ -186,39 +186,6 @@ void CZeissControllerX_Dialog::OnBnCZCloseControl()
 
 
 	return;
-	// General
-	PRINT(m_pZeissControlManager->get_stem_magnification());
-	PRINT(m_pZeissControlManager->get_spot_size());
-	PRINT(m_pZeissControlManager->get_camera_length());
-
-	// Gun
-	PRINT(m_pZeissControlManager->get_actual_emission_current());
-	
-	// Column
-	PRINT(m_pZeissControlManager->get_defocus());
-	PRINT(m_pZeissControlManager->get_focus());
-
-	// Stage | Goniometer
-	PRINT(m_pZeissControlManager->get_stage_x());
-	PRINT(m_pZeissControlManager->get_stage_y());
-	PRINT(m_pZeissControlManager->get_stage_z());
-	PRINT(m_pZeissControlManager->get_stage_tilt_angle());
-	PRINT(m_pZeissControlManager->get_stage_m());
-
-	// Beam
-	PRINT(m_pZeissControlManager->get_pixel_size());
-	
-	//Scanning
-	PRINT(m_pZeissControlManager->get_spot_pos_x());
-	PRINT(m_pZeissControlManager->get_spot_pos_y());
-	PRINT(m_pZeissControlManager->get_height());
-	PRINT(m_pZeissControlManager->get_width());
-
-	m_pZeissControlManager->set_stage_tilt_angle(0);
-	m_pZeissControlManager->set_stage_x(0);
-	m_pZeissControlManager->set_stage_y(0);
-	m_pZeissControlManager->set_stage_z(0);
-	//m_pZeissControlManager->MoveStage(0, 0, 0, 0, 0, 0);
 }
 
 

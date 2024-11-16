@@ -45,7 +45,15 @@ public:
 	CDataCollection*	m_pZeissDataCollection;
 	CImageManager*		m_pImageManager;
 	bool				m_bSaveLensParams;
-	bool Initialised() const { if (m_bInitialised == false) PRINT("API Not Initialied!"); return m_bInitialised; }
+	bool Initialised() const {
+		if (m_bInitialised == false)
+		{
+#ifndef _DEBUGGING_
+			PRINT("API Not Initialied!");
+#endif
+		}
+		return m_bInitialised;
+	}
 
 private:
 	// Api Setup methods
@@ -96,8 +104,8 @@ public:
 	float get_image_shift_y();
 	float get_illumination_tilt_x();
 	float get_illumination_tilt_y();
-	float get_objective_stig_x();
-	float get_objective_stig_y();
+	float get_illumination_stig_x();
+	float get_illumination_stig_y();
 
 	void set_illumination_shift_x(float fShift);
 	void set_illumination_shift_y(float fShift);
@@ -139,7 +147,7 @@ public:
 	bool is_stage_rotating(bool _bUpdate = false);
 
 	// Beam
-	float get_pixel_size(); // in meters, we convert it internally to uM
+	float get_sten_pixel_size(); // in meters, we convert it internally to uM
 	int get_beam_state();
 	void do_blank_beam(bool _blank);
 	void simulate_mdf(bool _bOn, TEMModeParameters* pTEMMode);

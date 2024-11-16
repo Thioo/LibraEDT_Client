@@ -6,6 +6,7 @@ struct ImagesInfo;
 struct SFrame;
 struct EucentricHeightRegion;
 struct Regresion;
+struct GridRegions;
 enum   TrackingMode;
 enum   ImgInfoPurpose;
 
@@ -102,7 +103,20 @@ public:
 	bool is_lens_stored();
 };
 
+struct GridRegions
+{
+	cv::Rect2f gridRegion;
+	float stage_z;
+	float angle;
+	bool isRegionScanned;
 
+	GridRegions() {
+		stage_z = 0.0f;
+		angle = 0.0f;
+		isRegionScanned = false;
+	}
+
+};
 
 class CDataCollection
 {
@@ -115,6 +129,10 @@ public:
 	void fine_beam_shift_calibration(int order = 4);
 	cv::Mat poly_fit(std::vector<cv::Point2f>& points, unsigned int order);
 	
+
+
+
+
 private:
 	static CDataCollection*	m_pZeissDataCollection;
 	CTEMControlManager*		m_pZeissControlManager;
@@ -181,8 +199,10 @@ public:
 	cv::Point2f					m_vShiftOffset;
 	cv::Point2f					m_vShiftOffset_rotation;
 	std::vector<cv::Point>		m_oCrystalPathCoordinates;
+	std::vector<cv::Point>		m_oCrystalPathCoordinatesSpline;
 	std::vector<TrackingData>	m_oTrackingDataVec;
 	std::vector<cv::Point>		m_oCrystalPathCoordinatesSwapped;
+	std::vector<cv::Point>		m_oCrystalPathCoordinatesSwappedSpline;
 	std::vector<_img_data>		_raw_img_vec;
 	_img_data					raw_img;
 	ILL_MODE					m_illumination_mode;
@@ -195,8 +215,16 @@ public:
 	float m_fRecordImgStepsVariable;
 	float m_fRecordImgStepStartingAngVariable;
 	float m_fRecordImgStepEndingAngVariable;
+	float m_fCameraLength;
 	bool m_bContinuousRecord;
 	bool m_bImageBasedRecord;
+
+	float m_fSerialED_ysteps;
+	float m_fSerialED_dmax;
+	float m_fSerialED_peakthreshold;
+	float m_fSerialED_i_sigma;
+	float m_fSerialED_peaksize;
+	int   m_iSerialED_min_num_peaks;
 	
 	bool m_bTimeBasedTrack;
 	bool m_bAngleBasedTrack;
@@ -216,6 +244,11 @@ public:
 	bool m_bOnTracking;
 	bool m_bOnRecording;
 	bool m_bOnRotateRequest;
+
+	bool m_bIs2DMapVisible;
+	bool m_bSerialEDScanRegions;
+	bool m_bTrackStageMovement;
+	cv::Point2f m_StagePosition2D;
 
 
 	int  m_iCalibrationDeltaGUI;
@@ -239,6 +272,14 @@ public:
 	TEMModeParameters m_oImagingParams;
 	TEMModeParameters m_oDiffractionParams;
 
+	tinyspline::BSpline m_oSplineX;
+	tinyspline::BSpline m_oSplineY;
+	xt::xarray<double>  m_oSplineInterpX;
+	xt::xarray<double>  m_oSplineInterpY;
+
+	static std::vector<GridRegions> gridRegions;
+
+
 	void set_control_manager(CTEMControlManager* _pCtrlMgr);
 	void Test();
 	void display_images_and_calculate_z_value();
@@ -250,7 +291,7 @@ public:
 	cv::Point2f estimate_current_beam_coordinates();
 	void do_beam_shift_at_coordinates(cv::Point2f& _targetPos, cv::Point2f* pStartingPos, cv::Point2f& _ill_shift_vec_init, cv::Point2f& _ill_shift_vec_final, bool bShiftBeam = false);
 	void do_beam_shift_at_coordinates_optimized(cv::Point2f& _targetPos, cv::Point2f& _ill_shift_vec_final, bool bShiftBeam = false);
-	void do_beam_shift_at_coordinates_alternative(cv::Point2f& _targetPos, bool bShiftBeam = false);
+	void do_beam_shift_at_coordinates_alternative(cv::Point2f& _targetPos, bool bShiftBeam = false, bool bOnUpdate = true);
 	void do_calibrate_beam_shift_tem();
 	float get_beam_calibration_y();
 	float get_beam_calibration_x();
@@ -279,8 +320,11 @@ private:
 	void do_timer_based_continuous_track_stem();
 	void do_linear_movement_for_continuous_rec_stem(TrackingMode _Mode);
 	void do_image_based_track_tem(float& _t1_angle, TrackingMode _Mode);
+	void do_image_based_track_tem_spline(float& _t1_angle, TrackingMode _Mode);
 	void do_image_based_track_stem2(float& _t1_angle, TrackingMode _Mode);
 	void do_image_based_track_stem(int& _t1_time, float& _t1_angle, TrackingMode _Mode);
+	tinyspline::BSpline generate_spline(xt::xarray<double>& params, xt::xarray<double>& ys);
+	xt::xarray<double> interpolate_spline(tinyspline::BSpline& spline, xt::xarray<double>& targetVals);
 	bool move_to_point_time_based(cv::Point2f& _start, cv::Point2f& _end, float _duration_ms, std::chrono::steady_clock::time_point& now);
 	bool move_to_point_time_based_tem(cv::Point2f& _startingPos, cv::Point2f& _targetPos, float _duration_ms, unsigned int _startingTime, unsigned int _currentTime);
 	bool move_to_point_time_based_stem(cv::Point2f& _startingPos, cv::Point2f& _targetPos, float _duration_ms, unsigned int _startingTime, unsigned int _currentTime);
@@ -291,6 +335,7 @@ private:
 	void do_live_stream_collected_frames();
 	void do_tilt_backlash_correction(float _fTargetAngle, bool _bPositiveDirection, float _offset = 5.0f, bool steps = false);
 	
+
 	void do_save_data_collection_parameters();
 	void do_fast_stage_movement_parameters();
 	void do_restore_data_collection_parameters();
@@ -302,6 +347,15 @@ private:
 	void do_move_stage_to_mouse_coordinates();
 	bool do_check_for_emergency_exit(DWORD _dwKey = VK_MULTIPLY);
 	
+
+
+	void display_2d_map();
+	static void onMouse_2DMap(int event, int x, int y, int, void* userdata); 
+	void do_serial_ed_regions_scan();
+	void serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec, unsigned int& imgIndex, unsigned int& validImgCount);
+public:
+	bool is_diffraction_pattern_valid(const cv::Mat&diffractionImg, int num_of_peaks, float d_max, bool bUseGFTT = true);
+
 
 public:
 	~CDataCollection();
@@ -315,9 +369,16 @@ public:
 	void do_collect_frames_ex();
 	void tcp_do_collect_frames_ex();
 	void infinite_loop_for_monitoring_ex();
-	void do_set_current_beam_screen_coordinates(float x, float y) { 
-		printf("Beam coordinates updated to (%.f, %.f)\n", x, y);
-		m_vCurrentBeamPosition.x = x; m_vCurrentBeamPosition.y = y; }
+	void do_set_current_beam_screen_coordinates(float x, float y, bool bLog = true) { 
+		m_vCurrentBeamPosition.x = x; m_vCurrentBeamPosition.y = y;
+		if (bLog)
+			printf("Beam coordinates updated to (%.f, %.f)\n", x, y);
+
+		// Reposition the beam
+		//do_beam_shift_at_coordinates_alternative(oldCoords, true, false);
+
+	}
+		
 	void do_set_current_illumination_shift_coordinates(float x, float y) {
 		printf("Illumination shift coordinates updated to (%.f, %.f)\n", x, y);
 		m_vCurrentIlluminationShift.x = x; m_vCurrentIlluminationShift.y = y;
@@ -330,6 +391,13 @@ public:
 	std::vector<my_params> save_tracking_data();
 	void restore_parameters();
 	void restore_tracking_data();
+	
+	
+	// 2D Stage Map
+	void prepare_for_2d_map();
+	// Stage Scan
+	void prepare_for_serialed_regions_scan();
+	cv::Point get_2d_stage_coordinates(float _stage_x, float _stage_y);
 
 
 	static CDataCollection* GetInstance();
@@ -338,6 +406,7 @@ public:
 	bool m_bPrecession;
 	bool m_bVariableRecordSteps;
 	bool m_bStepwiseRecord;
+
 };
 
 struct TrackingData

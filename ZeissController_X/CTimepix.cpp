@@ -1,13 +1,14 @@
 #include "pch.h"
 #include "Timepix/include/shared.h"
 #include "Timepix/include/mpxerrors.h"
+ 
 #define IMG_RESIZE_FACTOR_ 1
 
 CTimepix* CTimepix::m_pTimepix = nullptr;
 
 
 CTimepix::CTimepix() : m_pRelaxdModule(nullptr), m_bRelaxdInitialized(false), m_bLiveStreaming(false), m_iExposureTime(500), m_pData(nullptr),
-m_fContrast(2.0f), m_fBrightness(0.0f), m_bInvertColours(false), m_bCancopyLiveImg(false), m_iWaitkey(100), m_bRotateImg(false)
+m_fContrast(2.0f), m_fBrightness(0.0f), m_bInvertColours(false), m_bLiveFFT(false), m_bShowResolutionRings(false), m_bCancopyLiveImg(false), m_iWaitkey(100), m_bRotateImg(false)
 {
 	PRINTD("\t\t\t\tCTimepix::CTimepix() - Constructor");
 
@@ -182,9 +183,9 @@ void CTimepix::grab_image_from_detector(std::string& _fileName, int _exposureTim
 		PRINT("Relaxed Module is not connected or properly initialized!");
 }
 
-void CTimepix::save_image(std::string& _fileName, const void* _data, uint32_t iSize /*= 512*/)
+void CTimepix::save_image(std::string&_fileName, const void*_data, uint32_t iSize /*= 512*/, uint16_t type /*= 16*/ )
 {
-	TinyTIFFWriterFile* tiffWriter = TinyTIFFWriter_open(_fileName.c_str(), 16, TinyTIFFWriter_Int, 1, iSize, iSize, TinyTIFFWriter_Greyscale);
+	TinyTIFFWriterFile* tiffWriter = TinyTIFFWriter_open(_fileName.c_str(), type, TinyTIFFWriter_Int, 1, iSize, iSize, TinyTIFFWriter_Greyscale);
 	if (tiffWriter)
 	{
 		TinyTIFFWriter_writeImage(tiffWriter, _data);
@@ -213,6 +214,8 @@ void CTimepix::grab_image_live_stream()
 		// I believe this is only for IMAGING. For diffraction, this shouldn't be applied.
 		ILL_MODE illmode = CTEMControlManager::GetInstance()->get_illumination_mode();
 		IMG_MODE imgmode = CTEMControlManager::GetInstance()->get_image_mode();
+
+
 		if (illmode == TEM_MODE && imgmode == IMAGE_MODE)
 		{
 			cv::Point2f pt(m_oLiveImageMat.cols / 2., m_oLiveImageMat.rows / 2.);
@@ -247,7 +250,7 @@ void CTimepix::grab_image_live_stream()
 cv::Point zoomStart;
 cv::Rect zoomRect;
 int zoomWidth, zoomHeight;
-void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _vImageInfo)
+void onMouse_live_streaming(int event, int x, int y, int flag, void* _vImageInfo)
 {
 	if (CTimepix::GetInstance()->is_image_rotated_and_flipped())
 	{
@@ -271,10 +274,7 @@ void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _v
 
 			cv::Point2f dummy;
 			auto oldBeamPos = pDC->get_current_beam_screen_coordinates();
-			//pDC->do_beam_shift_at_coordinates(newBeamPos, nullptr, dummy, dummy, true);
-			//pDC->do_beam_shift_at_coordinates_optimized(newBeamPos, dummy, true);
 			pDC->do_beam_shift_at_coordinates_alternative(newBeamPos, true);
-			pDC->do_set_current_beam_screen_coordinates(newBeamPos.x, newBeamPos.y);
 
 			if (pDC->m_bOnTracking)
 			{
@@ -315,10 +315,8 @@ void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _v
 				auto pos = pTpx->m_vTargetBeamCoords.at(pTpx->m_iTargetBeamCoordsIndex);
 
 				cv::Point2f dummy;
-				//pDC->do_beam_shift_at_coordinates_optimized(pos, dummy, true);
 				pDC->do_beam_shift_at_coordinates_alternative(pos, true);
-				printf("Pos (%d) -- ", pTpx->m_iTargetBeamCoordsIndex + 1);
-				pDC->do_set_current_beam_screen_coordinates(pos.x, pos.y);
+				printf("Pos (%d) --\n", pTpx->m_iTargetBeamCoordsIndex + 1);
 
 			}
 		}
@@ -326,9 +324,13 @@ void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _v
 	}
 	else if (event == cv::EVENT_RBUTTONDBLCLK)
 	{
+		cv::Point2f oldBeamPos = CDataCollection::GetInstance()->get_current_beam_screen_coordinates();
 		CDataCollection::GetInstance()->do_set_current_beam_screen_coordinates(x / IMG_RESIZE_FACTOR_, y / IMG_RESIZE_FACTOR_);
 		if(TEMModeParameters::current_parameters == PARAM_DIFFRACTION)
 			CDataCollection::GetInstance()->m_oDiffractionParams.SaveCurrentParameters();
+
+		CDataCollection::GetInstance()->do_beam_shift_at_coordinates_alternative(oldBeamPos, true);
+
 	}
 	else if (event == cv::EVENT_MBUTTONDOWN)
 	{
@@ -348,6 +350,7 @@ void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _v
 		{
 			// Create the zoom rectangle
 			zoomRect = cv::Rect(std::min(zoomStart.x, x), std::min(zoomStart.y, y), zoomWidth, zoomHeight);
+			zoomWidth = zoomHeight = std::max(zoomWidth, zoomHeight);
 
 		}
 	}
@@ -361,9 +364,219 @@ void live_stream_image_mouse_handler(int event, int x, int y, int flag, void* _v
 	}
 }
 
-//img 297 297   33  311 
-//def 179 137   328 202
-//    118 160   
+
+struct DistortionCostFunctor
+{
+	DistortionCostFunctor(const cv::Point2d& center,
+		const std::pair<cv::Point2d, cv::Point2d>& pair)
+		: center(center), pair(pair) {
+	}
+
+	template <typename T>
+	bool operator()(const T* const k, T* residual) const
+	{
+		T k1 = k[0];
+		T k2 = k[1];
+
+		// Apply distortion model to both points
+		cv::Point2d p1_distorted = apply_radial_distortion(pair.first, center, k1, k2);
+		cv::Point2d p2_distorted = apply_radial_distortion(pair.second, center, k1, k2);
+
+		// Compute radial distances
+		T r1 = T(cv::norm(p1_distorted));
+		T r2 = T(cv::norm(p2_distorted));
+
+		// Compute angular positions
+		T theta1 = T(atan2(p1_distorted.y, p1_distorted.x));
+		T theta2 = T(atan2(p2_distorted.y, p2_distorted.x));
+
+		// Residuals
+		residual[0] = r1 - r2;
+		residual[1] = theta1 - theta2;
+
+		return true;
+	}
+
+	const cv::Point2d center;
+	const std::pair<cv::Point2d, cv::Point2d> pair;
+};
+
+
+cv::Point2d apply_radial_distortion(const cv::Point2d& point, const cv::Point2d& center, double k1, double k2)
+{
+	double x = point.x - center.x;
+	double y = point.y - center.y;
+	double r2 = x * x + y * y;
+	double radial_factor = 1 + k1 * r2 + k2 * r2 * r2;
+	double x_distorted = x * radial_factor;
+	double y_distorted = y * radial_factor;
+	return cv::Point2d(x_distorted, y_distorted);
+}
+
+
+// Cost function to minimize: sum of squared differences between distorted distances
+double distortion_cost(const cv::Point2d& center, const std::vector<std::pair<cv::Point2d, cv::Point2d>>& friedel_pairs)
+{
+	double cost = 0.0;
+	for (const auto& pair : friedel_pairs)
+	{
+		// Apply distortion model to both points
+		cv::Point2d p1_distorted = apply_radial_distortion(pair.first, center, 0, 0);
+		cv::Point2d p2_distorted = apply_radial_distortion(pair.second, center, 0, 0);
+
+		// Compute radial distances
+		double r1 = cv::norm(p1_distorted);
+		double r2 = cv::norm(p2_distorted);
+
+		// Compute angular positions
+		double theta1 = atan2(p1_distorted.y, p1_distorted.x);
+		double theta2 = atan2(p2_distorted.y, p2_distorted.x);
+
+		// Add squared differences to cost
+		cost += pow(r1 - r2, 2) + pow(theta1 - theta2, 2);
+	}
+	return cost;
+}
+
+
+
+// variable to store pairs of reflections coordinates (x1, y1) and (x2, y2)
+std::vector<std::pair<cv::Point2f, cv::Point2f>> g_reflectionPairs;
+std::vector<cv::Point2f> g_reflection;
+cv::Point2f g_mouseCoords;
+cv::Point2f g_centralBeamRefined;
+
+void onMouse_live_streaming_debugging(int event, int x, int y, int flag, void* params)
+{
+	static CCheetah_PeakFinder* pPeakFinder = nullptr;
+	static tPeakList* pPeakList = nullptr;
+	static bool bCentralBeamRefined = false;
+
+	if (pPeakFinder == nullptr)
+	{
+		pPeakFinder = CCheetah_PeakFinder::GetInstance();
+		if (pPeakList == nullptr)
+			pPeakList = pPeakFinder->GetPeakList();
+	}
+	g_mouseCoords = cv::Point2f(x, y);
+
+	// Let's see if we can somehow measure the distortions from our diffraction patterns...
+	if (event == cv::EVENT_LBUTTONDOWN)
+	{
+
+		cv::Point2f pos = cv::Point2f(x, y);
+
+		// Let's loop through all the peaks and see if we can find the closest one to the clicked position
+		float minDist = FLT_MAX;
+		int minIndex = -1;
+		for (int i = 0; i < pPeakList->nPeaks; i++)
+		{
+			cv::Point2f peakPos = cv::Point2f(pPeakList->peak_com_x[i], pPeakList->peak_com_y[i]);
+			float dist = cv::norm(pos - peakPos);
+			if (dist < minDist && dist < 20.0f) // 
+			{
+				minDist = dist;
+				minIndex = i;
+			}
+		}
+		g_reflection.emplace_back(cv::Point2f(pPeakList->peak_com_x[minIndex], pPeakList->peak_com_y[minIndex]));
+
+		if(g_reflection.size() >= 2) // Then we have a pair of reflections
+		{
+			g_reflectionPairs.emplace_back(g_reflection[0], g_reflection[1]);
+			g_reflection.clear();
+		}
+	}
+	else if (event == cv::EVENT_RBUTTONDOWN)
+	{
+		// LSQ fitting of all the pairs of reflections to find out the point of intersection
+		int num_lines = g_reflectionPairs.size();
+
+		if (num_lines >= 2)
+		{
+			// Initialize matrices for the least-squares system
+			cv::Mat A = cv::Mat::zeros(num_lines, 2, CV_64F); // Coefficient matrix (A_i and B_i)
+			cv::Mat b = cv::Mat::zeros(num_lines, 1, CV_64F); // Constant terms (-C_i)
+
+			for (int i = 0; i < num_lines; ++i) {
+				// Get points from the pair
+				cv::Point2d p1 = g_reflectionPairs[i].first;
+				cv::Point2d p2 = g_reflectionPairs[i].second;
+
+				// Calculate the line parameters (Ax + By + C = 0)
+				double A_i = p2.y - p1.y;   // A = y2 - y1
+				double B_i = p1.x - p2.x;   // B = x1 - x2
+				double C_i = p1.y * (p2.x - p1.x) - p1.x * (p2.y - p1.y); // C = y1 * (x2 - x1) - x1 * (y2 - y1)
+
+				// Normalize the coefficients (optional for numerical stability)
+				double norm = std::sqrt(A_i * A_i + B_i * B_i);
+				A_i /= norm;
+				B_i /= norm;
+				C_i /= norm;
+
+				// Populate the matrices
+				A.at<double>(i, 0) = A_i;
+				A.at<double>(i, 1) = B_i;
+				b.at<double>(i, 0) = -C_i;
+			}
+
+			// Solve the least-squares problem: minimize ||A * [x, y] - b||
+			cv::Mat solution;
+			cv::solve(A, b, solution, cv::DECOMP_SVD); // Use Singular Value Decomposition for LSQ
+
+			// The intersection point
+			g_centralBeamRefined.x = solution.at<double>(0, 0);
+			g_centralBeamRefined.y = solution.at<double>(1, 0);
+			bCentralBeamRefined = true;
+		}else
+			printf("Need at least 2 pairs of reflections to refine the central beam.\n");
+	}
+	else if (GetAsyncKeyState(VK_XBUTTON1) & 0x1)
+	{
+		if (g_reflection.empty())
+			g_reflectionPairs.clear();
+		else
+			g_reflection.clear();
+	}
+	else if (event == cv::EVENT_LBUTTONDBLCLK)
+	{
+		// Ensure we have enough reflection pairs
+		int num_pairs = g_reflectionPairs.size();
+
+		if (num_pairs >= 2)
+		{
+			// Initial guesses for distortion parameters
+			double rx = 1.0;  // Elliptical ratio along x (scaling factor)
+			double ry = 1.0;  // Elliptical ratio along y (scaling factor)
+			double theta = 0.0; // Elliptical angle (in radians)
+
+			// Optimization parameters
+			double learning_rate = 0.001;
+			int max_iterations = 1000;
+
+			// Gradient descent optimization
+			for (int iter = 0; iter < max_iterations; ++iter)
+			{
+				// Compute gradients (finite difference approximation)
+				double drx = 1e-5, dry = 1e-5, dtheta = 1e-5;
+
+				
+			}
+
+			// Output the refined distortion parameters
+			printf("Refined elliptical ratio (rx): %f\n", rx);
+			printf("Refined elliptical ratio (ry): %f\n", ry);
+			printf("Refined elliptical angle (theta in degrees): %f\n", theta * 180.0 / CV_PI);
+
+			// Optionally, you can now apply the distortion correction to your image or further processing
+			//bDistortionCorrected = true;
+		}
+		else
+		{
+			printf("Need at least 2 pairs of reflections to perform distortion correction.\n");
+		}
+	}
+}
 
 void CTimepix::stream_image_live_stream()
 {
@@ -375,12 +588,12 @@ void CTimepix::stream_image_live_stream()
 	std::string LiveStreamWindowName = "Live Streaming";
 	cv::namedWindow(LiveStreamWindowName);
 	cv::moveWindow(LiveStreamWindowName, 0, -620);
-	cv::setMouseCallback(LiveStreamWindowName, live_stream_image_mouse_handler, nullptr);
+	cv::setMouseCallback(LiveStreamWindowName, onMouse_live_streaming, nullptr);
 
 	std::string ZoomedLivedStreamWindowName = "Zoomed Live Streaming";
 	cv::namedWindow(ZoomedLivedStreamWindowName);
 	cv::moveWindow(ZoomedLivedStreamWindowName, 0, -620);
-	cv::setMouseCallback(ZoomedLivedStreamWindowName, live_stream_image_mouse_handler, nullptr);
+	cv::setMouseCallback(ZoomedLivedStreamWindowName, onMouse_live_streaming, nullptr);
 	cv::Mat contrastCorrected;
 
 	while (bStopLoop == false)
@@ -395,7 +608,8 @@ void CTimepix::stream_image_live_stream()
 				contrastCorrected.convertTo(contrastCorrected, CV_16UC1, 65535.0f / max_val); // Adjust contrast automatically
 
 				cv::convertScaleAbs(contrastCorrected, contrastCorrected, m_fContrast / 100.0f, m_fBrightness);
-				cv::resize(contrastCorrected, contrastCorrected, cv::Size(), 1.15, 1.15);
+				cv::resize(contrastCorrected, contrastCorrected, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
+				printf("DEBUGGING IMG_RESIZE_FACTOR__ = %d\n", IMG_RESIZE_FACTOR__);
 
 				if (m_bInvertColours)
 					cv::bitwise_not(contrastCorrected, contrastCorrected);
@@ -415,7 +629,7 @@ void CTimepix::stream_image_live_stream()
 				// Display the zoomed-in image
 				cv::imshow(ZoomedLivedStreamWindowName, zoomedInSquare);
 				auto q = cv::waitKey(m_iWaitkey);
-				if (q == 'q')
+				if (q == 'q' || q == 'Q' )
 					zoomRect.x = zoomRect.y = 0;
 				
 			}
@@ -441,11 +655,17 @@ cv::Mat CTimepix::correct_raw_image(cv::Mat& img_to_correct)
 	static float corrFacMid = 1.45f; 
 	cv::Mat correctImg;
 
-	if (GetAsyncKeyState(VK_ADD) & 0x1)
-		corrFac += 0.001f;
-	else if (GetAsyncKeyState(VK_SUBTRACT) & 0x1)
-		corrFac -= 0.001f;
+	//if (GetAsyncKeyState(VK_ADD) & 0x1)
+	//	corrFac += 0.001f;
+	//else if (GetAsyncKeyState(VK_SUBTRACT) & 0x1)
+	//	corrFac -= 0.001f;
 
+	// Check if flatfield image is loaded successfully
+	if (flatfield_img.empty())
+	{
+		std::cerr << "Error: Flatfield image not found or failed to load." << std::endl;
+		return img_to_correct;  // Return the uncorrected image if there's an error
+	}
 	// Flatfield Correction
 	img_to_correct.convertTo(img_to_correct, CV_32F);
 	flatfield_img.convertTo(flatfield_img, CV_32F);
@@ -624,6 +844,11 @@ void CTimepix::init_module()
 
 bool CTimepix::tcp_connect_to_server()
 {
+#if defined _DEBUGGING_
+	PRINT("SETTING CONNECTION TO SUCCESSFUL");
+	return true;
+#endif
+
 	WSADATA wsaData;
 	int iResult;
 
@@ -681,7 +906,7 @@ void CTimepix::tcp_grab_single_image_from_detector(std::string& fileName, int ex
 		int iResult = send(m_TpxSocket, reinterpret_cast<const char*>(&tcp_outPacket), dataSize, 0);
 		if (iResult == SOCKET_ERROR) {
 			std::cerr << "send failed with error: " << WSAGetLastError() << std::endl;
-			MB("This error shouldn't have happened!");
+			//MB("This error shouldn't have happened!");
 			closesocket(m_TpxSocket);
 			WSACleanup();
 			return;
@@ -693,7 +918,7 @@ void CTimepix::tcp_grab_single_image_from_detector(std::string& fileName, int ex
 				int bytes_received = recv(m_TpxSocket, reinterpret_cast<char*>(&tcp_inPacket) + received_size, dataSize - received_size, 0);
 				if (bytes_received < 0) {
 					std::cerr << "Failed to receive data\n";
-					MB("This error shouldn't have happened!");
+					//MB("This error shouldn't have happened!");
 					closesocket(m_TpxSocket);
 					WSACleanup();
 					return;
@@ -738,7 +963,7 @@ void CTimepix::tcp_grab_images_for_live_stream()
 		int iResult = send(m_TpxSocket, reinterpret_cast<const char*>(&tcp_outPacket), sizeof(outPacket), 0);
 		if (iResult == SOCKET_ERROR) {
 			std::cerr << "send failed with error: " << WSAGetLastError() << std::endl;
-			MB("This error shouldn't have happened!");
+			//MB("This error shouldn't have happened!");
 			closesocket(m_TpxSocket);
 			WSACleanup();
 			return;
@@ -810,6 +1035,19 @@ void CTimepix::tcp_grab_images_for_live_stream()
 					// If we're in precession mode, we don't want to store all the images, but just first one until next tilt
 					if (pDC->m_bPrecession)
 						tcp_store_diffraction_images = false;
+
+					// In SerialED, as it is implemented, the function could be running for hours, or even overnight. 
+					// So we don't and can't be storing all the images. So, we store around 1000 images in the raw_img vector
+					// Pause/Abort the stage movement, so that we can nicely check which images to store and which not to store
+					if (pDC->m_bSerialEDScanRegions)
+					{
+						if (pDC->_raw_img_vec.size() >= 500)
+						{
+							tcp_store_diffraction_images = false;
+							CTEMControlManager::GetInstance()->stage_abort_exec();
+						}
+					}
+
 				}
 
 				if(tcp_inPacket.is_last_packet)
@@ -827,47 +1065,392 @@ void CTimepix::tcp_grab_images_for_live_stream()
 	return;
 }
 
+void applyWindowFunction(cv::Mat& src) {
+	// Apply a Hanning window
+	cv::Mat hann;
+	cv::createHanningWindow(hann, src.size(), CV_32F);
+	src = src.mul(hann);
+}
+
+cv::Mat computeFFT(const cv::Mat& src) {
+	// Convert the image to float type
+	cv::Mat floatImg;
+	src.convertTo(floatImg, CV_32F);
+
+	// Apply a window function to reduce edge effects
+	applyWindowFunction(floatImg);
+
+	// Perform FFT
+	cv::Mat planes[] = { floatImg, cv::Mat::zeros(floatImg.size(), CV_32F) };
+	cv::Mat complexI;
+	cv::merge(planes, 2, complexI);
+	cv::dft(complexI, complexI);
+
+	// Compute the magnitude
+	cv::split(complexI, planes);
+	cv::magnitude(planes[0], planes[1], planes[0]);
+	return planes[0];
+}
+
+cv::Mat shiftFFT(const cv::Mat& magI) {
+	// Shift the quadrants of the FFT image to center the low frequencies
+	cv::Mat magIShifted = magI.clone();
+	magIShifted = magIShifted(cv::Rect(0, 0, magIShifted.cols & -2, magIShifted.rows & -2));
+	int cx = magIShifted.cols / 2;
+	int cy = magIShifted.rows / 2;
+
+	cv::Mat q0(magIShifted, cv::Rect(0, 0, cx, cy));
+	cv::Mat q1(magIShifted, cv::Rect(cx, 0, cx, cy));
+	cv::Mat q2(magIShifted, cv::Rect(0, cy, cx, cy));
+	cv::Mat q3(magIShifted, cv::Rect(cx, cy, cx, cy));
+
+	cv::Mat tmp;
+	q0.copyTo(tmp);
+	q3.copyTo(q0);
+	tmp.copyTo(q3);
+
+	q1.copyTo(tmp);
+	q2.copyTo(q1);
+	tmp.copyTo(q2);
+
+	return magIShifted;
+}
+
+void showFFT(const cv::Mat& src, const std::string& windowName) {
+	// Compute FFT and shift it
+	cv::Mat magI = computeFFT(src);
+	magI = shiftFFT(magI);
+
+	// Switch to a logarithmic scale
+	magI += cv::Scalar::all(1);
+	cv::log(magI, magI);
+
+	// Normalize the magnitude image for better visualization
+	//cv::normalize(magI, magI, 0, 1, cv::NORM_MINMAX);
+
+	double max_val;
+	minMaxLoc(magI, NULL, &max_val);
+	magI.convertTo(magI, CV_16UC1, 65535.0f / max_val); // Adjust contrast automatically
+	cv::convertScaleAbs(magI, magI, 0.8f * 0.5f * CTimepix::GetInstance()->m_fContrastDiff / 100.0f, CTimepix::GetInstance()->m_fBrightnessDiff);
+	
+
+	// Convert to 8-bit for display
+	// magI.convertTo(magI, CV_8UC1, 255);
+
+	
+
+	cv::imshow(windowName, magI);
+}
+
+
+void xt_shiftFFT(xt::xarray<std::complex<float>>& arr) {
+	int centerX = arr.shape()[0] / 2;
+	int centerY = arr.shape()[1] / 2;
+	xt::xarray<std::complex<double>> temp = arr;
+	xt::view(arr, xt::range(0, centerX), xt::range(0, centerY)) = xt::view(temp, xt::range(centerX, temp.shape()[0]), xt::range(centerY, temp.shape()[1]));
+	xt::view(arr, xt::range(centerX, temp.shape()[0]), xt::range(centerY, temp.shape()[1])) = xt::view(temp, xt::range(0, centerX), xt::range(0, centerY));
+	xt::view(arr, xt::range(0, centerX), xt::range(centerY, temp.shape()[1])) = xt::view(temp, xt::range(centerX, temp.shape()[0]), xt::range(0, centerY));
+	xt::view(arr, xt::range(centerX, temp.shape()[0]), xt::range(0, centerY)) = xt::view(temp, xt::range(0, centerX), xt::range(centerY, temp.shape()[1]));
+}
+
+
+void combinedLoGandGFTT(const cv::Mat& inputImage, std::vector<cv::Point2f>& detectedPeaks, int maxCorners = 20, double qualityLevel = 0.01, double minDistance = 10.0) {
+	// Step 1: Convert the image to grayscale if necessary
+	cv::Mat gray;
+	if (inputImage.channels() == 3) {
+		cv::cvtColor(inputImage, gray, cv::COLOR_BGR2GRAY);
+	}
+	else {
+		gray = inputImage.clone();
+	}
+
+	// Step 2: Apply Gaussian blur to reduce noise
+	cv::Mat blurred;
+	cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 1.0);
+
+	// Step 3: Apply Laplacian to detect edges and enhance features
+	cv::Mat laplacian;
+	cv::Laplacian(blurred, laplacian, CV_64F, 3);
+	cv::Mat absLaplacian;
+	cv::convertScaleAbs(laplacian, absLaplacian);
+
+	// Step 4: Normalize the Laplacian image for better contrast
+	cv::Mat normalized;
+	cv::normalize(absLaplacian, normalized, 0, 255, cv::NORM_MINMAX);
+	normalized.convertTo(normalized, CV_8U);
+
+	// Step 5: Apply Good Features to Track on the normalized Laplacian image
+	cv::goodFeaturesToTrack(normalized, detectedPeaks, maxCorners, qualityLevel, minDistance);
+}	
+
+cv::Mat adaptiveNormalize(const cv::Mat& image, double minIntensityThreshold = 500.0, double scaleFactor = 10.0) {
+	double minVal, maxVal;
+	cv::minMaxLoc(image, &minVal, &maxVal);
+
+	cv::Mat normalizedImage;
+	double minEffectiveVal = maxVal * 0.00f;
+
+	if (maxVal - minVal < minIntensityThreshold) {
+		// Low dynamic range case: apply an adaptive scaling factor
+		image.convertTo(normalizedImage, CV_16U, scaleFactor, -minEffectiveVal * scaleFactor);
+	}
+	else {
+		// Normal case: normalize to fit within the 14-bit range
+		image.convertTo(normalizedImage, CV_16U, std::pow(2, 16) / maxVal, -minEffectiveVal * (std::pow(2, 16) / maxVal));
+	}
+
+	return normalizedImage;
+}
+
+
 void CTimepix::tcp_live_stream_images()
 {
+	bool is_live_fft_window_running = false;
 	tcp_stop_live_stream_display = false;
 	std::string LiveStreamWindowName = "Live Streaming";
 	std::string ZoomLiveStreamWindowName = " Zoomed Live Streaming";
+	std::string FFTWindowName = "Live FFT (log scale)";
+
+	CImageManager* pImgMgr = CImageManager::GetInstance();
+
 
 	cv::namedWindow(LiveStreamWindowName);
-
+#ifndef _DEBUGGING_
 	cv::moveWindow(LiveStreamWindowName, 0, -620);
-	cv::setMouseCallback(LiveStreamWindowName, live_stream_image_mouse_handler, nullptr);
+#endif
+
+
+#ifdef _DEBUGGING_
+	cv::setMouseCallback(LiveStreamWindowName, onMouse_live_streaming_debugging, nullptr);
+#else
+	cv::setMouseCallback(LiveStreamWindowName, onMouse_live_streaming, nullptr);
+#endif
 	auto pDC = CDataCollection::GetInstance();
+
+#if defined _DEBUGGING_
+	PRINT("REMOVE LATER: CALLING DO_TRACK_EX");
+	pDC->do_track_ex();
+	PRINT("REMOVE LATER: CALLING DO_TRACK_EX");
+
+	std::vector<std::string> files;
+#endif // DEBUG
+
+	SCameraLengthSettings m_oCameraSettings(pDC->m_fCameraLength);
+	float fLastCameraLength = pDC->m_fCameraLength;
 	while (tcp_stop_live_stream_display == false)
 	{
 		this->tcp_lock_img_data = true;
 		std::unique_lock<std::mutex> lock(tcp_img_mtx);
+#ifndef _DEBUGGING_
 		m_oLiveImageMat = cv::Mat(512, 512, CV_16U, tcp_imgData);
+#else
+		static bool bOnce = false;
+
+		if (bOnce == false)
+		{
+			// Read a list of .tiff files in a directory and load them one by one
+			//std::string path = "C:/Users/Administrator/OneDrive - Fondazione Istituto Italiano Tecnologia/Documents/Temporary_Working_Files/LuAg/2023_07_01/002/tiff_corrected";
+			//std::string path = "C:/Users/Administrator/OneDrive - Fondazione Istituto Italiano Tecnologia/Documents/3D ED Data/ULL_MOF/2023_07_15/022/tiff_corrected";
+			//std::string path = "C:/Users/Administrator/OneDrive - Fondazione Istituto Italiano Tecnologia/Documents/3D ED Data/ICMOL_6/790/2024_06_10/001/tiff_corrected";
+			//std::string path = "C:/Users/Administrator/OneDrive - Fondazione Istituto Italiano Tecnologia/Documents/3D ED Data/test/";
+			//std::string path = "C:/SerialED/453e/2024_10_12/002_SerialED";
+			std::string path = "C:/SerialED/001_SerialED/distortions/4";
+			//std::string path = "C:/SerialED/006";
+			pDC->m_bSerialEDScanRegions = true;
+
+			for (const auto& entry : std::filesystem::directory_iterator(path)) {
+				if (entry.path().extension() == ".tiff")
+					files.push_back(entry.path().string());
+			}
+			bOnce = true;
+		}
+		
+		// Now we load the images one by one
+		//m_oLiveImageMat = cv::imread(files[rand() % files.size()], cv::IMREAD_UNCHANGED);
+		static int i = 0;
+		m_oLiveImageMat = cv::imread(files[i], cv::IMREAD_ANYDEPTH);
+		//m_oLiveImageMat = cv::imread("C:/SerialED/453e/2024_10_12/003_SerialED/0000000000.tiff", cv::IMREAD_UNCHANGED);
+		//if (GetAsyncKeyState(VK_MBUTTON) & 0x1)
+			i++;
+		i = 4;
+		if (i >= files.size())
+			i = 0;
+
+#endif
 		cv::Mat correctImg = m_oLiveImageMat.clone();
+
+		
+
 		lock.unlock();
 		this->tcp_lock_img_data = false;
 
 		if (m_oLiveImageMat.empty() == false)
 		{
-			//m_oLiveImageMat = m_oLiveImageMat.clone();
-			correctImg = correct_raw_image(m_oLiveImageMat);
+
+#ifndef _DEBUGGING_
+			correctImg = correct_raw_image(correctImg);
+			//cv::Mat crossCorr;
+			//CPostDataCollection::do_flatfield_correction(correctImg);
+			//CPostDataCollection::do_dead_pixels_correction(correctImg);
+			//CPostDataCollection::do_cross_correction(correctImg, crossCorr);
+			//correctImg = crossCorr;
+
+#else
+			if (correctImg.cols == 512 && correctImg.rows == 512)
+			{
+				cv::Mat crossCorr;
+				CPostDataCollection::do_flatfield_correction(correctImg);
+				CPostDataCollection::do_dead_pixels_correction(correctImg);
+				CPostDataCollection::do_cross_correction(correctImg, crossCorr);
+				correctImg = crossCorr;
+
+			}
+#endif // !_DEBUGGING_
+			
+
 
 			tcp_rotate_and_flip_image(correctImg);
-			double max_val;
-			minMaxLoc(correctImg, NULL, &max_val);
-			correctImg.convertTo(correctImg, CV_16UC1, 65535.0f / max_val); // Adjust contrast automatically
+			
 
+			
+			double min_val, max_val;
+			minMaxLoc(correctImg, &min_val, &max_val);
+			if (max_val < 3)
+			{
+				correctImg -= max_val;
+				max_val = 0;
+			}
+
+			//correctImg.convertTo(correctImg, CV_16UC1, std::pow(2,16) / max_val); 
+			correctImg = adaptiveNormalize(correctImg);
+			cv::resize(correctImg, correctImg, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
+			printf("DEBUGGING IMG_RESIZE_FACTOR__: %d\n", IMG_RESIZE_FACTOR__);
+			
+			cv::Mat correctImgCopy = correctImg.clone();
 			cv::convertScaleAbs(correctImg, correctImg, 0.8f * 0.5f * m_fContrast / 100.0f, m_fBrightness);
-			cv::resize(correctImg, correctImg, cv::Size(), 1.15, 1.15);
+			//correctImg.convertTo(correctImg, CV_16U, 1.0f * m_fContrast, m_fBrightness);
 
+			//cv::GaussianBlur(correctImgCopy, correctImgCopy, cv::Size(55, 55), 1);
+
+			//cv::medianBlur(correctImg, correctImg, 5);
 			if (m_bInvertColours)
 				cv::bitwise_not(correctImg, correctImg);
 
-			auto crystalPath = pDC->m_oCrystalPathCoordinates; // Default, in diffraction mode
-			if(m_bRotateImg)
-				crystalPath = pDC->m_oCrystalPathCoordinatesSwapped; // Swapped, in image mode
+			//correctImg = pImgMgr->preprocessImageForPeakDetection(correctImg, pDC->m_fSerialED_peaksize, 2);
 
-			if(pDC->m_bOnTracking || GetAsyncKeyState(0x56) & 0x8000) // Key==V
+			if (m_bLiveFFT) {
+				//showFFT(m_oLiveImageMat, FFTWindowName);
+				
+				auto image = m_oLiveImageMat.clone();
+				if(image.cols % 2 == 0 && image.rows % 2 == 0) // Make sure that rows & cols are even numbers
+				{
+					// Convert image to float and normalize
+					image.convertTo(image, CV_32F);
+					image = image / cv::norm(image, cv::NORM_INF);
+
+					// Adapt cv::Mat to xt::xarray
+					xt::xarray<float> arr1 = xt::adapt(reinterpret_cast<float*>(image.data), { static_cast<size_t>(image.rows), static_cast<size_t>(image.cols) });
+
+					// Perform FFT
+					auto fft_arr1 = xt::fftw::fft2(xt::xarray<std::complex<float>>(arr1));
+					xt_shiftFFT(fft_arr1);
+
+					// Calculate magnitude spectrum
+					xt::xarray<double> magnitude_spectrum = xt::abs(fft_arr1);
+
+					// Convert magnitude spectrum to log scale for visualization
+					xt::xarray<float> log_magnitude_spectrum = xt::log(magnitude_spectrum + 1e-5);
+
+					// Convert the log magnitude spectrum to cv::Mat for visualization
+					cv::Mat log_magnitude_mat(log_magnitude_spectrum.shape()[0], log_magnitude_spectrum.shape()[1], CV_32F, log_magnitude_spectrum.data());
+
+					double max_val;
+					cv::minMaxLoc(log_magnitude_mat, nullptr, &max_val);
+					log_magnitude_mat.convertTo(log_magnitude_mat, CV_8UC1, 255.0 / max_val);
+					if (m_bInvertColours)
+						cv::bitwise_not(log_magnitude_mat, log_magnitude_mat);
+
+					// Display the magnitude spectrum
+					cv::imshow(FFTWindowName, log_magnitude_mat);
+					is_live_fft_window_running = true;
+				}
+
+			}
+			else
+			{
+				if (is_live_fft_window_running)
+					cv::destroyWindow(FFTWindowName);
+				is_live_fft_window_running = false;
+			}
+
+
+			auto crystalPath = pDC->m_oCrystalPathCoordinates; // Default, in diffraction mode
+			auto crystalPathSpline = pDC->m_oCrystalPathCoordinatesSpline;
+
+			if(m_bRotateImg)
+			{
+				crystalPath = pDC->m_oCrystalPathCoordinatesSwapped; // Swapped, in image mode
+				crystalPathSpline = pDC->m_oCrystalPathCoordinatesSwappedSpline;
+			}
+			
+			cv::Point2f centralBeamPos;
+			if(m_bShowPeaks || m_bShowResolutionRings)
+			{
+				bool bCentralBeamValid = pImgMgr->find_central_beam_position(correctImgCopy, centralBeamPos);
+
+
+
+				if(bCentralBeamValid)
+				{
+					if (fLastCameraLength != pDC->m_fCameraLength)
+					{
+						fLastCameraLength = pDC->m_fCameraLength;
+						m_oCameraSettings.UpdateCameraLengthSettings(pDC->m_fCameraLength);
+					}
+
+					if (m_bShowResolutionRings)
+						pImgMgr->draw_resolution_rings(correctImg, centralBeamPos, m_oCameraSettings.flPixelSize / IMG_RESIZE_FACTOR__);
+
+					if (m_bShowPeaks)
+					{
+						std::vector <cv::Point2f> detectedPeaks, detectedPeaks2;
+						std::vector <cv::Point2f> rejectedPeaks, rejectedPeaks2;
+						
+						pImgMgr->detect_diffraction_peaks_cheetahpf8(correctImgCopy, centralBeamPos, m_oCameraSettings.flPixelSize / IMG_RESIZE_FACTOR__, pDC->m_bSerialEDScanRegions ? pDC->m_fSerialED_dmax : 0.20f, detectedPeaks, pDC->m_fSerialED_i_sigma, pDC->m_fSerialED_peaksize, pDC->m_fSerialED_peakthreshold, 1);
+
+						if (correctImg.channels() == 1)
+							cv::cvtColor(correctImg, correctImg, cv::COLOR_GRAY2BGR);
+						for (const auto& peak : detectedPeaks) {
+							cv::circle(correctImg, peak, pDC->m_fSerialED_peaksize, cv::Scalar(0, 255, 0), 1);
+						}
+
+#ifdef _DEBUGGING_
+
+						if (g_reflection.size() == 1)
+						{
+							cv::circle(correctImg, g_reflection.at(0), pDC->m_fSerialED_peaksize, cv::Scalar(0, 255, 0), -1);
+							cv::line(correctImg, g_reflection.at(0), g_mouseCoords, cv::Scalar(0, 255, 0), 2);
+						}
+
+						// loop through the g_reflectionPairs and draw a circle around the peaks
+						for (auto& reflectionPair : g_reflectionPairs)
+						{
+							// random color
+							auto color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
+							cv::circle(correctImg, reflectionPair.first, pDC->m_fSerialED_peaksize - 2, cv::Scalar(0, 255, 255), -1);
+							cv::circle(correctImg, reflectionPair.second, pDC->m_fSerialED_peaksize - 2, cv::Scalar(0, 255, 255), -1);
+							cv::line(correctImg, reflectionPair.first, reflectionPair.second, cv::Scalar(0, 255, 255), 1);
+						}
+#endif
+
+					}
+				}
+
+
+			}
+
+
+			if(pDC->m_bOnTracking || GetAsyncKeyState(0x56) & 0x8000) // Key==V -> Show pos and crystal path
 			{
 				auto a = pDC->get_current_beam_screen_coordinates();
 				cv::Point2f pos;
@@ -879,11 +1462,20 @@ void CTimepix::tcp_live_stream_images()
 				if(CTEMControlManager::GetInstance()->is_on_stem_mode() == false)
 				{
 					//cv::Mat display = correctImg.clone();
-					cv::ellipse(correctImg, pos, cv::Size(ImagesInfo::_radius, ImagesInfo::_radius), 0, 0, 360, cv::Scalar(65000, 0, 65000), 2); // good alternative :)
-					cv::polylines(correctImg, crystalPath, false, cv::Scalar(65000, 0, 65000), 1);
+					if(correctImg.channels() == 1)
+						cv::cvtColor(correctImg, correctImg, cv::COLOR_GRAY2BGR);
+					cv::ellipse(correctImg, pos, cv::Size(ImagesInfo::_radius, ImagesInfo::_radius), 0, 0, 360, cv::Scalar(0, 255, 0), 2); // good alternative :)
+					cv::polylines(correctImg, crystalPath, false, cv::Scalar(255, 0, 255), 1); // This is the linear path
+					cv::polylines(correctImg, crystalPathSpline, false, cv::Scalar(255, 255, 125), 1); // this should be the spline path
 					for (const cv::Point& point : crystalPath) {
 						cv::circle(correctImg, point, 2, cv::Scalar(255, 0, 0), -1); // Draws a small filled circle at each point
 					}
+
+#ifdef _DEBUGGING_
+					cv::resize(correctImg, correctImg, cv::Size(), 2, 2);
+#endif // DEBUG
+
+
 				}
 				cv::imshow(LiveStreamWindowName, correctImg);
 			}
@@ -899,26 +1491,29 @@ void CTimepix::tcp_live_stream_images()
 				}
 				
 
-				if (zoomRect.x == 0 && zoomRect.y == 0)
+				cv::imshow(LiveStreamWindowName, correctImg);
+				if (zoomRect.x != 0 && zoomRect.y != 0)
 				{
-					cv::imshow(LiveStreamWindowName, correctImg);
-				}
-				else
-				{
-					cv::Mat zoomedInSquare = correctImg(zoomRect);
-					// Resize the cropped region to fit the window
-					zoomWidth == 0 ? zoomWidth = 1 : zoomWidth = zoomWidth;
-					zoomHeight == 0 ? zoomHeight = 1 : zoomHeight = zoomHeight;
-					cv::resize(zoomedInSquare, zoomedInSquare, cv::Size(), 516/ zoomWidth, 516 / zoomHeight); // You can adjust the zoom factor here
+					if(zoomRect.width > 0 || zoomRect.height > 0)
+					{
+						zoomRect.width = zoomRect.height = std::max(zoomWidth, zoomHeight);
 
-					// Display the zoomed-in image
-					cv::imshow(ZoomLiveStreamWindowName, zoomedInSquare);
+						cv::Mat zoomedInSquare = correctImg(zoomRect);
+						cv::resize(zoomedInSquare, zoomedInSquare, cv::Size(), correctImg.cols / zoomRect.width, correctImg.rows / zoomRect.height);
+
+						// Display the zoomed-in image
+						cv::imshow(ZoomLiveStreamWindowName, zoomedInSquare);
+					}
 
 				}
 			}
 
+#ifndef _DEBUGGING_
 			auto k = cv::waitKey(1);
-			if(k == 'q')
+#else
+			auto k = cv::waitKey(100);
+#endif
+			if(k == 'q' || k == 'Q')
 			{
 				if (zoomRect.x || zoomRect.y)
 				{

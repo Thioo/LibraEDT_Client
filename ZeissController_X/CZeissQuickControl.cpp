@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "CZeissQuickControl.h"
 
-CZeissQuickControl::CZeissQuickControl() : m_pZeissController(nullptr), m_pZeissStage(nullptr), m_bUpdateData(false), m_magMode(MAG_MODE::MAG_MODE_TEM)
+CZeissQuickControl::CZeissQuickControl() : m_pZeissController(nullptr), m_pZeissStage(nullptr), m_bUpdateData(false), m_bIsSTEM(false), m_magMode(MAG_MODE::MAG_MODE_TEM)
 {
 	m_pZeissController	= CTEMControlManager::GetInstance();
 	m_pZeissStage		= new CZeissStage(m_pZeissController);
@@ -196,6 +196,9 @@ float CZeissQuickControl::get_spot_size()
 
 float CZeissQuickControl::get_camera_length()
 {
+#ifdef _DEBUGGING_
+	return 180.0f;
+#endif
 	if (m_pZeissController == nullptr)
 		return 0.0f; 
 	return m_pZeissController->get_camera_length();

@@ -77,4 +77,13 @@ public:
 	afx_msg void OnDeltaposDcQcChangeBrightness(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnBnClickedDcUpdateRecordInfo();
 	afx_msg void OnBnClickedDcSaveRawImg();
+	afx_msg void OnBnClicked2dradar();
+	afx_msg void OnBnClickedDcQc2dradar();
+	afx_msg void OnBnClickedDcScanregions();
+	afx_msg void OnBnClickedDcSerialedAddfovtoregion();
+	afx_msg void OnBnClickedDcSerialedCaptureregionsfromimage();
+	afx_msg void OnBnClickedDcQcSpeedxy80();
+	afx_msg void OnBnClickedDcQcSpeedxy50();
+	afx_msg void OnBnClickedDcQcSpeedxy20();
+	afx_msg void OnBnClickedDcQcSpeedxy5();
 };

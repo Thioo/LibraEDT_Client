@@ -9,7 +9,7 @@ public:
 	float fX_um, fY_um, fZ_um, fT, fR, fM;
 	VARIANT vX_m, vY_m, vZ_m, vT, vR, vM;
 
-
+	float fTargetX, fTargetY, fTargetZ, fTargetT; // This variables will store the last target coordinates. So they should be updated afger
 	
 public:
 	~CZeissStage();

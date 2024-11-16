@@ -29,6 +29,18 @@ CZeissStage::~CZeissStage()
 CZeissStage::CZeissStage(CTEMControlManager* _pControlManager)
 {
 	fX_um = fY_um = fZ_um = fT = fR = fM = 0.0f;
+	fTargetT = fTargetX = fTargetY = fTargetZ = 0.0f;
+
+	// Initialize the target coordinates with the current stage coordinates instead of 0.0f
+/*
+	fTargetX = this->get_stage_x();
+	fTargetY = this->get_stage_y();
+	fTargetZ = this->get_stage_z();
+	fTargetT = this->get_current_tilt_angle();
+*/
+
+
+
 	ZM(vX_m); ZM(vY_m); ZM(vZ_m); ZM(vT); ZM(vR); ZM(vM);
 
 	m_pZeissControlManager = _pControlManager;
@@ -76,7 +88,7 @@ void CZeissStage::move_stage_to_pixel_coordinates(float _x, float _y)
 	// This function doesn't belong to this class. Will be moved out in the future
 
 	PRINTD("\t\t\t\CZeissStage::MoveStageToPixelCoordinates\n");
-	float fPixelSize = m_pZeissControlManager->get_pixel_size(); // already converted to uM;
+	float fPixelSize = m_pZeissControlManager->get_sten_pixel_size(); // already converted to uM;
 	
 	//printf("TESTING: Pixelsize: %.2f\n", fPixelSize);
 	float fCurrentX = STEMRESX / 2.0f;
@@ -107,6 +119,8 @@ void CZeissStage::stage_rotate_to_angle(float _fAng)
 void CZeissStage::stage_rotate_to_delta_angle(float _fDelta)
 {
 	this->fT = get_current_tilt_angle();
+	fTargetT = fT + _fDelta;
+
 	m_pZeissControlManager->set_stage_tilt_delta(_fDelta);
 	this->fT += _fDelta;
 }
@@ -134,23 +148,29 @@ ZeissErrorCode CZeissStage::get_stage_coordinates()
 
 void CZeissStage::stage_go_to_x(float _x)
 {
+	fTargetX = _x;
 	m_pZeissControlManager->set_stage_x(_x / 1000000);
 }
 
 
 void CZeissStage::stage_go_to_y(float _y)
 {
+	fTargetY = _y;
 	m_pZeissControlManager->set_stage_y(_y / 1000000);
 
 }
 
 void CZeissStage::stage_go_to_z(float _z)
 {
+	fTargetZ = _z;
 	m_pZeissControlManager->set_stage_z(_z / 1000000);
 }
 
 void CZeissStage::stage_go_to_xy(float _x, float _y)
 {
+	fTargetX = _x;
+	fTargetY = _y;
+
 	stage_go_to_x(_x);
 	stage_go_to_y(_y);
 }

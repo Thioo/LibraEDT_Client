@@ -41,6 +41,8 @@ void CZeissDataCollection_Dialog::UpdateDataCollectionParameters()
 {
 	CString _usrMsg;
 	float fValue = 0.0f;
+	int iValue = 0;
+
 	GetDlgItemText(IDC_ANG_FROM, _usrMsg);
 	fValue = m_pZeissDataCollection->m_fStartingAng = static_cast<float>(atof(_usrMsg));
 	m_pZeissDataCollection->m_fStartingAng = std::clamp(m_pZeissDataCollection->m_fStartingAng, -60.0f, 60.0f);
@@ -104,6 +106,53 @@ void CZeissDataCollection_Dialog::UpdateDataCollectionParameters()
 	if (fValue < 5.0f || fValue > 500.0f)
 		SetDlgItemText(IDC_DC_CALIBRATION_DELTA, _usrMsg);
 
+
+	GetDlgItemText(IDC_DC_SERIALED_YSTEPS, _usrMsg);
+	fValue = m_pZeissDataCollection->m_fSerialED_ysteps = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_fSerialED_ysteps = std::clamp(m_pZeissDataCollection->m_fSerialED_ysteps, 0.10f, 10.0f);
+	_usrMsg.Format("%.2f", m_pZeissDataCollection->m_fSerialED_ysteps);
+	if (fValue < 0.10f || fValue > 10.0f)
+		SetDlgItemText(IDC_DC_SERIALED_YSTEPS, _usrMsg);
+
+	GetDlgItemText(IDC_DC_SERIALED_DMAX, _usrMsg);
+	fValue = m_pZeissDataCollection->m_fSerialED_dmax = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_fSerialED_dmax = std::clamp(m_pZeissDataCollection->m_fSerialED_dmax, 0.05f, 1.0f);
+	_usrMsg.Format("%.2f", m_pZeissDataCollection->m_fSerialED_dmax);
+	if (fValue < 0.00f || fValue > 1.0f)
+		SetDlgItemText(IDC_DC_SERIALED_DMAX, _usrMsg);
+
+	GetDlgItemText(IDC_DC_SERIALED_MINPEAKS, _usrMsg);
+	iValue = m_pZeissDataCollection->m_iSerialED_min_num_peaks = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_iSerialED_min_num_peaks = std::clamp(m_pZeissDataCollection->m_iSerialED_min_num_peaks, 1, 50);
+	_usrMsg.Format("%d", m_pZeissDataCollection->m_iSerialED_min_num_peaks);
+	if (iValue < 0 || iValue > 1000)
+		SetDlgItemText(IDC_DC_SERIALED_MINPEAKS, _usrMsg);
+
+	GetDlgItemText(IDC_DC_SERIALED_THRESHOLD_OR_PEAKDISTANCE, _usrMsg);
+	fValue = m_pZeissDataCollection->m_fSerialED_peakthreshold = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_fSerialED_peakthreshold = std::clamp(m_pZeissDataCollection->m_fSerialED_peakthreshold, 1.00f, 1000.0f);
+	_usrMsg.Format("%.2f", m_pZeissDataCollection->m_fSerialED_peakthreshold);
+	if (fValue < 0.00f || fValue > 100000.0f)
+		SetDlgItemText(IDC_DC_SERIALED_THRESHOLD_OR_PEAKDISTANCE, _usrMsg);
+
+	GetDlgItemText(IDC_DC_SERIALED_I_SIGMA, _usrMsg);
+	fValue = m_pZeissDataCollection->m_fSerialED_i_sigma = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_fSerialED_i_sigma = std::clamp(m_pZeissDataCollection->m_fSerialED_i_sigma, 0.00f, 500.0f);
+	_usrMsg.Format("%.2f", m_pZeissDataCollection->m_fSerialED_i_sigma);
+	if (fValue < 0.00f || fValue > 5000.0f)
+		SetDlgItemText(IDC_DC_SERIALED_I_SIGMA, _usrMsg);
+
+	GetDlgItemText(IDC_DC_SERIALED_PEAKSIZE, _usrMsg);
+	fValue = m_pZeissDataCollection->m_fSerialED_peaksize = static_cast<float>(atof(_usrMsg));
+	m_pZeissDataCollection->m_fSerialED_peaksize = std::clamp(m_pZeissDataCollection->m_fSerialED_peaksize, 1.00f, 50.0f);
+	_usrMsg.Format("%.2f", m_pZeissDataCollection->m_fSerialED_peaksize);
+	if (fValue < 0.00f || fValue > 500.0f)
+		SetDlgItemText(IDC_DC_SERIALED_PEAKSIZE, _usrMsg);
+
+	
+
+
+
 	//m_pZeissDataCollection->m_bContinuousRecord = IsDlgButtonChecked(IDC_DC_CONTINUOUS_RECRD_RDBTN);
 	m_pZeissDataCollection->m_bImageBasedRecord = IsDlgButtonChecked(IDC_DC_IMGBASED_RECRD_RDBTN);
 
@@ -123,6 +172,7 @@ void CZeissDataCollection_Dialog::UpdateDataCollectionParameters()
 	m_pZeissDataCollection->m_bMoveMouseTest = IsDlgButtonChecked(IDC_DC_MOVEMOUSE_CHCKBTN);
 	m_pZeissDataCollection->m_bReadjustZValue = IsDlgButtonChecked(IDC_DC_READJUST_Z_CHCKBTN);
 	m_pZeissDataCollection->m_bCorrectCalibration = IsDlgButtonChecked(IDC_DC_CORRECT_CALIBRATION);
+	m_pZeissDataCollection->m_bTrackStageMovement = IsDlgButtonChecked(IDC_DC_TRACKSTAGE_CHCKBTN);
 	m_pTEMControlManager->m_bSaveLensParams = IsDlgButtonChecked(IDC_DC_SAVE_LENS_PARAMS);
 	if (m_pZeissDataCollection->m_bSingleRun == false)
 	{
@@ -164,6 +214,11 @@ void CZeissDataCollection_Dialog::UpdateDataCollectionParameters()
 	m_pTimepix->m_fBrightnessImg = static_cast<float>(atof(_usrMsg));
 
 	m_pTimepix->m_bInvertColours = IsDlgButtonChecked(IDC_DC_CB_INVERTED) ? true : false;
+	m_pTimepix->m_bShowPeaks = (IsDlgButtonChecked(IDC_DC_CB_SHOWPEAKS) && m_pZeissQuickControl->m_imgMode == DIFFRACTION_MODE) ? true : false;
+	m_pTimepix->m_bShowResolutionRings = (IsDlgButtonChecked(IDC_DC_CB_SHOWRINGS) && m_pZeissQuickControl->m_imgMode == DIFFRACTION_MODE) ? true : false;
+	m_pTimepix->m_bLiveFFT = IsDlgButtonChecked(IDC_DC_CB_LIVEFFT) ? true : false;
+
+
 
 }
 
@@ -190,7 +245,8 @@ void CZeissDataCollection_Dialog::InitItems()
 
 
 				pWriter->is_config_loaded = true;
-			}
+			}else
+				PRINT("Only parameters saved on the same day are loaded.\You should see this message only once per day.");
 		}
 	}
 
@@ -212,6 +268,12 @@ void CZeissDataCollection_Dialog::InitItems()
 	SetDlgItemText(IDC_DC_NUM_OF_FRAMES_TO_TAKE, "0");
 	SetDlgItemText(IDC_DC_RECORD_IMG_STEPS, "2.0");
 	SetDlgItemText(IDC_DC_RECORD_IMG_STEPS_VARIABLE, "2.0");
+	SetDlgItemText(IDC_DC_SERIALED_YSTEPS, "1.0");
+	SetDlgItemText(IDC_DC_SERIALED_DMAX, "0.8");
+	SetDlgItemText(IDC_DC_SERIALED_THRESHOLD_OR_PEAKDISTANCE, "5.0");
+	SetDlgItemText(IDC_DC_SERIALED_I_SIGMA, "5.0");
+	SetDlgItemText(IDC_DC_SERIALED_PEAKSIZE, "7.0");
+	SetDlgItemText(IDC_DC_SERIALED_MINPEAKS, "2");
 
 	CheckDlgButton(IDC_DC_IMGBASED_RECRD_RDBTN, true);
 	CheckDlgButton(IDC_DC_IMG_BASED_TRCK_RDBTN, true);
@@ -241,6 +303,13 @@ void CZeissDataCollection_Dialog::InitItems()
 		SetDlgItemText(IDC_DC_DELTA_Z, std::format("{:.2f}", pDC->m_fEucentricHeightDeltaZ).c_str());
 		SetDlgItemText(IDC_DC_RECORD_IMG_STEPS, std::format("{:.2f}", pDC->m_fRecordImgSteps).c_str());
 		SetDlgItemText(IDC_DC_RECORD_IMG_STEPS_VARIABLE, std::format("{:.2f}", pDC->m_fRecordImgStepsVariable).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_YSTEPS, std::format("{:.2f}", pDC->m_fSerialED_ysteps).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_DMAX, std::format("{:.2f}", pDC->m_fSerialED_dmax).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_THRESHOLD_OR_PEAKDISTANCE, std::format("{:.2f}", pDC->m_fSerialED_peakthreshold).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_I_SIGMA, std::format("{:.2f}", pDC->m_fSerialED_i_sigma).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_PEAKSIZE, std::format("{:.2f}", pDC->m_fSerialED_peaksize).c_str());
+		SetDlgItemText(IDC_DC_SERIALED_MINPEAKS, std::format("{:d}", pDC->m_iSerialED_min_num_peaks).c_str());
+
 
 		CheckDlgButton(IDC_DC_IMGBASED_RECRD_RDBTN, pDC->m_bImageBasedRecord);
 		CheckDlgButton(IDC_DC_BLANK_ROT, pDC->m_bDoBlankRotation);
@@ -292,8 +361,17 @@ void CZeissDataCollection_Dialog::UpdateDataGUI()
 		_textVal.Format("%.2f", m_pZeissQuickControl->get_spot_size());
 		SetDlgItemText(IDC_DC_QC_READ_SPOTSIZE, _textVal);
 
-		_textVal.Format("%.2f", m_pZeissQuickControl->get_camera_length());
+		dc->m_fCameraLength = m_pZeissQuickControl->get_camera_length();
+		_textVal.Format("%.2f", dc->m_fCameraLength);
 		SetDlgItemText(IDC_DC_QC_READ_CAMLENGTH, _textVal);
+
+		_textVal.Format("%d", m_pZeissDataCollection->gridRegions.size());
+		SetDlgItemText(IDC_DC_NUMREGIONS, _textVal);
+
+		m_pZeissQuickControl->m_imgMode = m_pTEMControlManager->get_image_mode();
+		m_pZeissQuickControl->m_bIsSTEM = m_pTEMControlManager->is_on_stem_mode();
+
+
 
 		this->UpdateDataCollectionParameters();
 
@@ -318,7 +396,7 @@ void CZeissDataCollection_Dialog::UpdateDataGUI()
 		if (m_bQuitThreads)
 			break;
 		//std::this_thread::sleep_for(2s);
-		std::this_thread::sleep_for(500ms);
+		std::this_thread::sleep_for(100ms);
 	}
 }
 
@@ -389,6 +467,14 @@ BEGIN_MESSAGE_MAP(CZeissDataCollection_Dialog, CDialogEx)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_DC_QC_CHANGE_BRIGHTNESS, &CZeissDataCollection_Dialog::OnDeltaposDcQcChangeBrightness)
 	ON_BN_CLICKED(IDC_DC_UPDATE_RECORD_INFO, &CZeissDataCollection_Dialog::OnBnClickedDcUpdateRecordInfo)
 	ON_BN_CLICKED(IDC_DC_SAVE_RAW_IMG, &CZeissDataCollection_Dialog::OnBnClickedDcSaveRawImg)
+	ON_BN_CLICKED(IDC_DC_QC_2DRadar, &CZeissDataCollection_Dialog::OnBnClickedDcQc2dradar)
+	ON_BN_CLICKED(IDC_DC_SCANREGIONS, &CZeissDataCollection_Dialog::OnBnClickedDcScanregions)
+	ON_BN_CLICKED(IDC_DC_SERIALED_ADDFOVTOREGION, &CZeissDataCollection_Dialog::OnBnClickedDcSerialedAddfovtoregion)
+	ON_BN_CLICKED(IDC_DC_SERIALED_CAPTUREREGIONSFROMIMAGE, &CZeissDataCollection_Dialog::OnBnClickedDcSerialedCaptureregionsfromimage)
+	ON_BN_CLICKED(IDC_DC_QC_SPEEDXY_80, &CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy80)
+	ON_BN_CLICKED(IDC_DC_QC_SPEEDXY_50, &CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy50)
+	ON_BN_CLICKED(IDC_DC_QC_SPEEDXY_20, &CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy20)
+	ON_BN_CLICKED(IDC_DC_QC_SPEEDXY_5, &CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy5)
 END_MESSAGE_MAP()
 
 
@@ -425,6 +511,11 @@ void CZeissDataCollection_Dialog::OnBnClickedDcBtnClose()
 	m_pTimepix->m_bLiveStreaming = false;
 	m_pTimepix->tcp_is_live_streaming = false;
 	GetDlgItem(IDC_DC_LIVESTREAMING)->SetWindowText("Start Streaming");
+
+	m_pZeissDataCollection->m_bIs2DMapVisible = false;
+	GetDlgItem(IDC_DC_QC_2DRadar)->SetWindowText("Show 2D Map");
+
+
 
 	CWriteFile::GetInstance()->write_params_file();
 }
@@ -545,11 +636,16 @@ void CZeissDataCollection_Dialog::OnBnClickedDcLivestreaming()
 		else
 			PRINT("Patience! Communication with Timepix has not been established yet!");
 
+#ifdef _DEBUGGING_
+		m_pTimepix->tcp_is_live_streaming = true;
+#endif
+
 	}
 	else
 	{
 		m_pTimepix->m_bLiveStreaming = false;
 		m_pTimepix->tcp_is_live_streaming = false;
+		CheckDlgButton(IDC_DC_CB_LIVEFFT, false);
 		GetDlgItem(IDC_DC_LIVESTREAMING)->SetWindowText("Start Streaming");
 	}
 }
@@ -749,6 +845,11 @@ void CZeissDataCollection_Dialog::OnBnClickedDcCollectFrames()
 		return;
 	}
 
+	if (CTEMControlManager::GetInstance()->is_stage_busy())
+	{
+		PRINT("Stage is busy, please wait until it's idle.");
+		return;
+	}
 	this->disable_items();
 	//bool bStartStreamingAfterwards = m_pTimepix->m_bLiveStreaming;
 	//if (bStartStreamingAfterwards)
@@ -902,7 +1003,7 @@ void CZeissDataCollection_Dialog::OnBnClickedDcLoadDiffBtn()
 		cv::Point2f dummy;
 		pDC->do_beam_shift_at_coordinates_alternative(pos, true);
 		printf("Pos (%d) -- ", pTpx->m_iTargetBeamCoordsIndex + 1);
-		pDC->do_set_current_beam_screen_coordinates(pos.x, pos.y);
+		//pDC->do_set_current_beam_screen_coordinates(pos.x, pos.y);
 		pMscope->do_blank_beam(false);
 	}
 	CWriteFile::GetInstance()->write_params_file();
@@ -937,9 +1038,9 @@ void CZeissDataCollection_Dialog::create_required_directories()
 	std::string sOperatorName = m_pZeissDataCollection->m_sOperatorName;
 	sOperatorName.append("/");
 
-	m_pZeissDataCollection->m_sDatasetPath = "C:/Moussa_Software_Data/" + sOperatorName + sDateandName + sCrystalName;
-	m_pZeissDataCollection->m_sRawImagePath = "C:/Moussa_Software_Data/" + sOperatorName + sDateandName + "RawImages/";
-	m_pZeissDataCollection->m_sBeamCalibrationPath = "C:/Moussa_Software_Data/" + sOperatorName + sDateandName + "BeamCalibration/";
+	m_pZeissDataCollection->m_sDatasetPath = "D:/Moussa_Software_Data/" + sOperatorName + sDateandName + sCrystalName;
+	m_pZeissDataCollection->m_sRawImagePath = "D:/Moussa_Software_Data/" + sOperatorName + sDateandName + "RawImages/";
+	m_pZeissDataCollection->m_sBeamCalibrationPath = "D:/Moussa_Software_Data/" + sOperatorName + sDateandName + "BeamCalibration/";
 	m_pZeissDataCollection->m_sEucentricHeightPath = m_pZeissDataCollection->m_sDatasetPath + "EucentricHeight/";
 	m_pZeissDataCollection->m_sTrackingImgPath = m_pZeissDataCollection->m_sDatasetPath + "CrystalTracking/";
 	
@@ -962,11 +1063,9 @@ int items_list[] = {
 IDC_DC_RECORD, IDC_DC_TRACK, IDC_DC_COLLECT_FRAMES, IDC_DC_REVIEW_BTN, IDC_ANG_FROM, IDC_ANG_TO,
 IDC_DC_QC_SPEED_20, IDC_DC_QC_SPEED_40,IDC_DC_QC_SPEED_50 ,IDC_DC_QC_SPEED_70,
 IDC_DC_SAVE_DIFF_BTN, IDC_DC_SAVE_IMGING_BTN, IDC_DC_SAVE_SEARCH_BTN, IDC_DC_CALIB_BEAM,
-/*IDC_DC_LOAD_DIFF_BTN, IDC_DC_LOAD_IMGING_BTN, IDC_DC_LOAD_SEARCH_BTN,*/ IDC_DC_QC_TOGLARGESCREEN,
-IDC_DC_QC_TOGBLANKING, IDC_DC_QC_TOGPARALLEL, IDC_DC_QC_WRITE_EMISSIONSTEP,
-IDC_DC_IMGBASED_RECRD_RDBTN, /*IDC_DC_CONTINUOUS_RECRD_RDBTN,*/ IDC_DC_IMG_BASED_TRCK_RDBTN,
-/*IDC_DC_ANGLE_BASED_TRCK_RDBTN, IDC_DC_TIMER_BASED_TRCK_RDBTN, IDC_DC_LINEAR_MOV_CHECKBTN,*/
-IDC_DC_IMGBASED_ANGLEBASED_CHCKBTN, IDC_DC_READJUST_Z_CHCKBTN, IDC_DC_MOVEMOUSE_CHCKBTN
+IDC_DC_QC_TOGLARGESCREEN, IDC_DC_QC_TOGBLANKING, IDC_DC_QC_TOGPARALLEL, IDC_DC_QC_WRITE_EMISSIONSTEP,
+IDC_DC_IMGBASED_RECRD_RDBTN, IDC_DC_IMG_BASED_TRCK_RDBTN,IDC_DC_SCANREGIONS,
+IDC_DC_SERIALED_ADDFOVTOREGION, IDC_DC_SERIALED_CAPTUREREGIONSFROMIMAGE	
 };
 
 void CZeissDataCollection_Dialog::disable_items()
@@ -1026,10 +1125,6 @@ void CZeissDataCollection_Dialog::OnDeltaposDcQcChangeBrightness(NMHDR* pNMHDR, 
 
 
 
-
-
-
-
 void CZeissDataCollection_Dialog::OnBnClickedDcUpdateRecordInfo()
 {
 
@@ -1065,4 +1160,180 @@ void CZeissDataCollection_Dialog::OnBnClickedDcSaveRawImg()
 		sPath.append(std::format("raw_{}_{:03d}.tiff",m_pZeissDataCollection->m_sCrystalName,iCount));
 		m_pTimepix->tcp_grab_single_image_from_detector(sPath);
 	}
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcQc2dradar()
+{
+
+	if(m_pZeissDataCollection->m_bIs2DMapVisible == false)
+	{
+		m_pZeissDataCollection->prepare_for_2d_map();
+
+		GetDlgItem(IDC_DC_QC_2DRadar)->SetWindowText("Close 2D Map");
+	}
+	else
+	{
+		m_pZeissDataCollection->m_bIs2DMapVisible = false;
+		GetDlgItem(IDC_DC_QC_2DRadar)->SetWindowText("Show 2D Map");
+
+	}
+
+
+
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcScanregions()
+{
+	this->disable_items();
+	if(m_pZeissDataCollection->m_bSerialEDScanRegions == false)
+	{
+		this->UpdateDataCollectionParameters();
+		this->create_required_directories();
+
+		if (m_pZeissDataCollection->gridRegions.size() > 0)
+		{
+			m_pZeissDataCollection->m_bSerialEDScanRegions = true;
+			m_pZeissDataCollection->prepare_for_serialed_regions_scan();
+
+		}
+		else
+			PRINT("Make sure to select regions to scan.");
+
+	}
+
+	CWriteFile::GetInstance()->write_params_file();
+
+
+}
+
+
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcSerialedAddfovtoregion()
+{
+	if (m_pZeissQuickControl->m_bIsSTEM == false)
+	{
+		PRINT("This feature is only available in STEM mode.");
+		return;
+	}
+
+	this->create_required_directories();
+	std::string sFoV2Region = m_pZeissDataCollection->m_sDatasetPath + "FoV_ScanRegions/";
+	CWriteFile::create_directory(sFoV2Region);
+
+	// Count number of images (.tiffs) in the folder
+	unsigned int iCount = 0;
+	for (const auto& entry : std::filesystem::directory_iterator(sFoV2Region))
+	{
+		if (entry.path().extension() == ".tiff")
+			iCount++;
+	}
+
+	sFoV2Region.append(std::format("FoV_{}_{:05d}.tiff", m_pZeissDataCollection->m_sCrystalName, iCount));
+	CTEMControlManager::GetInstance()->acquire_stem_image(sFoV2Region, iCount);
+	std::this_thread::sleep_for(500ms);
+	CTEMControlManager::GetInstance()->freeze_stem_mode(false);
+	//CTEMControlManager::GetInstance()->set_scanning_speed(1);
+
+	cv::Mat oFovImg = cv::imread(sFoV2Region, cv::IMREAD_UNCHANGED);
+	if (oFovImg.empty())
+	{
+		PRINT("Failed to load the image.");
+		return;
+	}
+
+	cv::Point midPoint = cv::Point(oFovImg.cols / 2, oFovImg.rows / 2); // -> Current Stage Position in the image
+
+	cv::Point toTopLeft = cv::Point(0, 0) - midPoint;
+	cv::Point toTopRight = cv::Point(oFovImg.cols, 0) - midPoint;
+	cv::Point toBottomRight = cv::Point(oFovImg.cols, oFovImg.rows) - midPoint;
+	cv::Point toBottomLeft = cv::Point(0, oFovImg.rows) - midPoint;
+
+	// Convert the points to microns
+	float fMicronsPerPixel = CTEMControlManager::GetInstance()->get_sten_pixel_size();
+	toTopLeft.x *= fMicronsPerPixel;
+	toTopLeft.y *= fMicronsPerPixel;
+	
+	toTopRight.x *= fMicronsPerPixel;
+	toTopRight.y *= fMicronsPerPixel;
+
+	toBottomRight.x *= fMicronsPerPixel;
+	toBottomRight.y *= fMicronsPerPixel;
+
+	toBottomLeft.x *= fMicronsPerPixel;
+	toBottomLeft.y *= fMicronsPerPixel;
+
+	// Get the current stage position
+	cv::Point2f oStagePos = cv::Point2f(CTEMControlManager::GetInstance()->get_stage_x(), CTEMControlManager::GetInstance()->get_stage_y()); // in meters
+	oStagePos *= 1e6; // in microns
+
+	// Calculate the new positions
+	cv::Point2f oTopLeft = oStagePos + cv::Point2f(toTopLeft.x, toTopLeft.y);
+	cv::Point2f oTopRight = oStagePos + cv::Point2f(toTopRight.x, toTopRight.y);
+	cv::Point2f oBottomRight = oStagePos + cv::Point2f(toBottomRight.x, toBottomRight.y);
+	cv::Point2f oBottomLeft = oStagePos + cv::Point2f(toBottomLeft.x, toBottomLeft.y);
+
+	cv::Point2f stageCoords2DTopLeft = m_pZeissDataCollection->get_2d_stage_coordinates(oTopLeft.x, oTopLeft.y);
+	cv::Point2f stageCoords2DTopRight = m_pZeissDataCollection->get_2d_stage_coordinates(oTopRight.x, oTopRight.y);
+	cv::Point2f stageCoords2DBottomRight = m_pZeissDataCollection->get_2d_stage_coordinates(oBottomRight.x, oBottomRight.y);
+	cv::Point2f stageCoords2DBottomLeft = m_pZeissDataCollection->get_2d_stage_coordinates(oBottomLeft.x, oBottomLeft.y);
+
+	// Convert into a ROI Region
+	cv::Rect2f oROI = cv::Rect2f(stageCoords2DTopLeft, stageCoords2DBottomRight);
+
+	// Add the region to the list
+	GridRegions oGridRegion;
+	oGridRegion.gridRegion = oROI;
+	oGridRegion.angle = CTEMControlManager::GetInstance()->get_stage_tilt_angle();
+	oGridRegion.stage_z = CTEMControlManager::GetInstance()->get_stage_z() * 1e6; // in microns
+	m_pZeissDataCollection->gridRegions.push_back(oGridRegion);
+
+}
+
+
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcSerialedCaptureregionsfromimage()
+{
+	if (m_pZeissQuickControl->m_bIsSTEM == false)
+	{
+		PRINT("This feature is only available in STEM mode.");
+		return;
+	}
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy80()
+{
+	auto zeiss = CTEMControlManager::GetInstance();
+	if (zeiss)
+		zeiss->set_stage_xy_speed(80);
+
+
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy50()
+{
+	auto zeiss = CTEMControlManager::GetInstance();
+	if (zeiss)
+		zeiss->set_stage_xy_speed(50);
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy20()
+{
+	auto zeiss = CTEMControlManager::GetInstance();
+	if (zeiss)
+		zeiss->set_stage_xy_speed(20);
+}
+
+
+void CZeissDataCollection_Dialog::OnBnClickedDcQcSpeedxy5()
+{
+	auto zeiss = CTEMControlManager::GetInstance();
+	if (zeiss)
+		zeiss->set_stage_xy_speed(5);
 }

@@ -8,6 +8,7 @@
 #define PCH_H
 #define _CRT_SECURE_NO_WARNINGS
 #define _REPORT_TO_CONSOLE_
+#define _DEBUGGING_
 //#define _REPORT_TO_CONSOLE_FUNCTION_NAMES_
 
 
@@ -57,6 +58,10 @@
 #include <format>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
+#include "tinysplinecxx.h"
+#include <xtensor.hpp>
+#include <xtensor-fftw/basic.hpp>
+#include <xtensor-fftw/helper.hpp>
 
 // For the GUI
 #include <windows.h>	
@@ -76,6 +81,7 @@
 #include "CTimer.h"
 #include "CWriteFile.h"
 #include "CLinearMover.h"
+#include "Cheetah_PeakFinder.h"
 #include "CImageManager.h"
 #include "ZeissController_X.h"
 #include "CTEMControlManager.h"

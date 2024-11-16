@@ -162,7 +162,7 @@ void CTEMControlManager::PrintErrorMsg(const ZeissErrorCode& _zErrCode)
         break;
 
     case API_E_GET_AP_FAIL:
-        PRINT("ZeissErrorCode: Failed to get analogue value");
+       // PRINT("ZeissErrorCode: Failed to get analogue value");
         break;
 
     case API_E_GET_DP_FAIL:
@@ -218,7 +218,9 @@ void CTEMControlManager::PrintErrorMsg(const ZeissErrorCode& _zErrCode)
         break;
 
     case API_E_NOT_INITIALISED:
+#ifndef _DEBUGGING_
         PRINT("ZeissErrorCode: API not initialised.");
+#endif
         break;
 
     case API_E_GRAB_FAIL:
@@ -283,6 +285,10 @@ ILL_MODE CTEMControlManager::get_illumination_mode()
 
 IMG_MODE CTEMControlManager::get_image_mode()
 {
+#ifdef _DEBUGGING_
+	return DIFFRACTION_MODE;
+#endif
+
 	// 0 == IMAGE
 	// 1 == DIFFRACTION
 
@@ -943,13 +949,44 @@ float CTEMControlManager::get_illumination_tilt_y()
 }
 
 
-float CTEMControlManager::get_objective_stig_x()
+float CTEMControlManager::get_illumination_stig_x()
 {
-	
+	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_stig_x\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_ILL_STIG_X", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
 }
 
-float CTEMControlManager::get_objective_stig_y()
+
+
+float CTEMControlManager::get_illumination_stig_y()
 {
+	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_stig_y\n");
+
+	VARIANT _var;
+	//ZM(_var);
+	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_ILL_STIG_Y", _var);
+	if (zeissRetCode == API_E_NO_ERROR)
+		return _var.fltVal;
+	else
+	{
+		if (zeissRetCode == API_E_NOT_INITIALISED)
+			return 0.0f;
+		PrintErrorMsg(zeissRetCode);
+		PrintReturnType(_var);
+	}
+	return 0.0f;
 
 }
 
@@ -1505,7 +1542,7 @@ bool CTEMControlManager::is_stage_rotating(bool _bUpdate /*= false*/)
 	return true;
 }
 
-float CTEMControlManager::get_pixel_size()
+float CTEMControlManager::get_sten_pixel_size()
 {
     PRINTD("\t\t\t\tCTEMControlManager::GetPixelSize(uM)\n");
 
