@@ -624,6 +624,7 @@ void CPostDataCollection::do_make_xds_file()
 
 	std::string run_xds_path = m_xds_proc_folder + "run_xds.bat";
 	std::ofstream run_xds_out(run_xds_path, std::ios::binary);
-	run_xds_out << "bash -ilc xds";
+	run_xds_out << "bash -ilc xds\n";
+	run_xds_out << "bash";
 	run_xds_out.close();
 }

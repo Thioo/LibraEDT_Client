@@ -1,4 +1,8 @@
 #pragma once
+
+// Stolen/Adapted from --> https://github.com/antonbarty/cheetah
+
+
 typedef struct {
 public:
 	long	    nPeaks;
@@ -32,8 +36,7 @@ void freePeakList(tPeakList);
 class CCheetah_PeakFinder
 {
 
-	static CCheetah_PeakFinder* m_pCheetahPeakFinder;
-	CCheetah_PeakFinder(unsigned int rows, unsigned int cols);
+	//static CCheetah_PeakFinder* m_pCheetahPeakFinder;
 	tPeakList peaklist;
 	
 	long* m_inx;
@@ -50,6 +53,7 @@ class CCheetah_PeakFinder
 
 public:
 	float* m_pix_r;
+	CCheetah_PeakFinder(unsigned int rows, unsigned int cols);
 
 
 public:
@@ -61,7 +65,7 @@ public:
 	void reset_variables();
 
 	static CCheetah_PeakFinder* GetInstance(unsigned int rows, unsigned int cols);
-	static CCheetah_PeakFinder* GetInstance();
+	//static CCheetah_PeakFinder* GetInstance();
 	tPeakList* GetPeakList();
 	~CCheetah_PeakFinder();
 };

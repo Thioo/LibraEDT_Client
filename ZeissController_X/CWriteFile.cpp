@@ -209,13 +209,37 @@ void CWriteFile::write_params(std::vector<my_params>& params, std::ofstream& fil
 
 void CWriteFile::write_params_file()
 {
-	std::ofstream config_file(_param_file_name);
+	
+    std::ofstream config_file(_param_file_name, std::ios::out);
+    if (!config_file.is_open()) {
+        throw std::runtime_error("Failed to open parameter file: " + _param_file_name);
+    }
+
+    auto params_vec = CDataCollection::GetInstance()->save_parameters();
+    if (params_vec.empty()) {
+        // Log warning or handle accordingly
+    }
+
+    write_params(params_vec, config_file);
+
+    if (!config_file.good()) {
+        throw std::runtime_error("Error occurred while writing parameters to file: " + _param_file_name);
+    }
+
+    config_file.close(); // Optional, done automatically at scope end
+    
+    /*
+    std::ofstream config_file(_param_file_name);
+    
+    // check and make sure that config_file can be used
+
 
     // From CDataCollection
     auto params_vec = CDataCollection::GetInstance()->save_parameters();
     write_params(params_vec, config_file);
 
     config_file.close();
+    */
 }
 
 void CWriteFile::write_tracking_data(std::string& fileName)
@@ -227,6 +251,17 @@ void CWriteFile::write_tracking_data(std::string& fileName)
 	write_params(params_vec, config_file);
 
 	config_file.close();
+}
+
+void CWriteFile::write_serial_data(std::string& fileName)
+{
+    std::ofstream config_file(fileName);
+
+    // From CDataCollection
+    auto params_vec = CDataCollection::GetInstance()->save_serialed_data();
+    write_params(params_vec, config_file);
+
+    config_file.close();
 }
 
 void CWriteFile::read_params_file(std::string sFileName, std::map<std::string, std::string>* configMap)

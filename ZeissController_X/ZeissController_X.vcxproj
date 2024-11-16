@@ -80,7 +80,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>C:\Users\Administrador\Documents\Visual Studio 2022\Projects\ZeissController_X_FromImport\ZeissController_X\Timepix;C:\Users\Administrador\Documents\Visual Studio 2022\Projects\ZeissController_X_FromImport\ZeissController_X\TinyTiff\Libs;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Program Files\opencv\build\x86\vc12\lib;C:\Users\Administrador\Documents\Visual Studio 2022\Projects\ZeissController_X_FromImport\ZeissController_X_FromImport\ZeissController_X\Timepix;C:\Users\Administrador\Documents\Visual Studio 2022\Projects\ZeissController_X_FromImport\ZeissController_X_FromImport\ZeissController_X\TinyTiff\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -123,7 +123,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\opencv\build\x86\vc12\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>mpxhwrelaxd.lib;opencv_ts300d.lib;opencv_world300d.lib;TinyTIFFShared_Debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
@@ -142,16 +142,16 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>C:\Program Files\opencv\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard_C>Default</LanguageStandard_C>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MinSpace</Optimization>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -271,7 +271,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Windows_Linux_Client_Server.cpp" />
     <ClCompile Include="ZeissController_X.cpp" />
     <ClCompile Include="ZeissControllerX_Dialog.cpp" />
   </ItemGroup>
@@ -286,8 +285,6 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Notes.txt" />
-    <Text Include="Notes_2.txt" />
-    <Text Include="Notes_3.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

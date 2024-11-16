@@ -6,7 +6,7 @@ CTEMControlManager::CTEMControlManager() : m_pZeissApi(nullptr), m_bInitialised(
 {
     this->CreateConsole(); Sleep(10);
 
-    PRINTD("\t\t\t\tCTEMControlManager::CTEMControlManager\n");
+    PRINTD("\t\tCTEMControlManager::CTEMControlManager\n");
     static bool bDoOnce = false;
     if (bDoOnce == false) // Things that should only be initialized ONCE should go here.
     {
@@ -20,7 +20,7 @@ CTEMControlManager::CTEMControlManager() : m_pZeissApi(nullptr), m_bInitialised(
 
     if (m_pStage)
     {
-        if (this->InitializeApi() && this->PatchLicense())
+        if (this->InitializeApi())
             m_bInitialised = true; // Initialized and licensed
     }
     else
@@ -33,7 +33,7 @@ CTEMControlManager::CTEMControlManager() : m_pZeissApi(nullptr), m_bInitialised(
 
 bool CTEMControlManager::InitializeApi()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::InitializeApi\n");
+    PRINTD("\t\tCTEMControlManager::InitializeApi\n");
     bool bReturn = false;
     HRESULT hResult = CoInitialize(nullptr);
     if (SUCCEEDED(hResult))
@@ -69,26 +69,7 @@ bool CTEMControlManager::InitializeApi()
 	return bReturn;
 }
 
-bool CTEMControlManager::PatchLicense()
-{
-    PRINTD("\t\t\t\tCTEMControlManager::PatchLicense\n");
-    PRINT("Patching API License...");
-	DWORD dwBase = (DWORD)(GetModuleHandle("CZEMApi.ocx"));
-	if (dwBase == NULL)
-	{
-		PRINT("GetModuleHandle(Api) FAILED\nThis is very weird!!!\nAborting...");
-		return false;
-	}
 
-	DWORD dwTargetAddr = dwBase + 0x36F3;
-	DWORD dwOld = NULL;
-	VirtualProtect((LPVOID)dwTargetAddr, 0x4, PAGE_EXECUTE_READWRITE, &dwOld);
-	*(BYTE*)(dwTargetAddr) = 0xEB;
-	VirtualProtect((LPVOID)dwTargetAddr, 0x4, dwOld, &dwOld);
-
-	//PRINT("API License was successfully patched... Use wisely :)");
-    return true;
-}
 
 void CTEMControlManager::CreateConsole()
 {
@@ -96,12 +77,12 @@ void CTEMControlManager::CreateConsole()
     freopen("CONIN$", "r", stdin);
     freopen("CONOUT$", "w", stdout);
     freopen("CONOUT$", "w", stderr);
-    PRINTD("\t\t\t\tCTEMControlManager::CreateConsole\n");
+    PRINTD("\t\tCTEMControlManager::CreateConsole\n");
 }
 
 void CTEMControlManager::PrintReturnType(const VARIANT& _var)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::PrintReturnType\n");
+    PRINTD("\t\tCTEMControlManager::PrintReturnType\n");
     char	cReturnMsg[MAX_PATH];
     ZM(cReturnMsg);
     wchar_t wReturnMsg[MAX_PATH];
@@ -150,7 +131,7 @@ void CTEMControlManager::PrintReturnType(const VARIANT& _var)
 
 void CTEMControlManager::PrintErrorMsg(const ZeissErrorCode& _zErrCode)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::PrintErrorMsg\n");
+    PRINTD("\t\tCTEMControlManager::PrintErrorMsg\n");
     switch (_zErrCode)
     {
     case API_E_NO_ERROR:
@@ -239,7 +220,7 @@ void CTEMControlManager::PrintErrorMsg(const ZeissErrorCode& _zErrCode)
 
 void CTEMControlManager::GetLastErrorPrint()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetLastErrorPrint\n");
+    PRINTD("\t\tCTEMControlManager::GetLastErrorPrint\n");
     VARIANT v;
 	wchar_t wReturnMsg[MAX_PATH];
 	ZM(wReturnMsg);
@@ -254,7 +235,7 @@ void CTEMControlManager::ShowAboutBox()
 {
     if (Initialised() == false)
         return;
-    PRINTD("\t\t\t\tCTEMControlManager::ShowAboutBox\n");
+    PRINTD("\t\tCTEMControlManager::ShowAboutBox\n");
     m_pZeissApi->AboutBox();
 }
 
@@ -263,7 +244,7 @@ ILL_MODE CTEMControlManager::get_illumination_mode()
 	// 0 == TEM
 	// 1 == SPOT
 
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_mode\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_mode\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -292,7 +273,7 @@ IMG_MODE CTEMControlManager::get_image_mode()
 	// 0 == IMAGE
 	// 1 == DIFFRACTION
 
-	PRINTD("\t\t\t\tCTEMControlManager::get_image_mode\n");
+	PRINTD("\t\tCTEMControlManager::get_image_mode\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -315,7 +296,7 @@ MAG_MODE CTEMControlManager::get_mag_mode()
 	// 0 == NORMAL MAG
 	// 1 == LOW MAG
 
-	PRINTD("\t\t\t\tCTEMControlManager::get_mag_mode\n");
+	PRINTD("\t\tCTEMControlManager::get_mag_mode\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -336,7 +317,7 @@ MAG_MODE CTEMControlManager::get_mag_mode()
 
 void CTEMControlManager::set_image_mode(IMG_MODE mode)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_image_mode\n");
+	PRINTD("\t\tCTEMControlManager::set_image_mode\n");
 	if (this->get_illumination_mode() != TEM_MODE) // MANUAL
 		return;
 
@@ -360,7 +341,7 @@ void CTEMControlManager::set_image_mode(IMG_MODE mode)
 
 void CTEMControlManager::set_mag_mode(MAG_MODE mode)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_mag_mode\n");
+	PRINTD("\t\tCTEMControlManager::set_mag_mode\n");
 	if (this->get_illumination_mode() != TEM_MODE) // MANUAL
 		return;
 
@@ -385,7 +366,7 @@ void CTEMControlManager::set_mag_mode(MAG_MODE mode)
 
 float CTEMControlManager::get_stem_magnification()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetSTEMMagnification\n");
+    PRINTD("\t\tCTEMControlManager::GetSTEMMagnification\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -404,7 +385,7 @@ float CTEMControlManager::get_stem_magnification()
 
 void CTEMControlManager::set_stem_magnification(float _fMag)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSTEMMagnification\n");
+	PRINTD("\t\tCTEMControlManager::SetSTEMMagnification\n");
     if (_fMag > 20000000.0f)
         _fMag = 20000000.0f;
     if (_fMag < 4000.0f)
@@ -429,7 +410,7 @@ void CTEMControlManager::set_stem_magnification(float _fMag)
 
 void CTEMControlManager::set_magnification_index(float _fIndex)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_magnification_index\n");
+	PRINTD("\t\tCTEMControlManager::set_magnification_index\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -450,7 +431,7 @@ void CTEMControlManager::set_magnification_index(float _fIndex)
 
 void CTEMControlManager::set_spec_mag_index(float _fIndex)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_spec_mag_index\n");
+	PRINTD("\t\tCTEMControlManager::set_spec_mag_index\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -472,7 +453,7 @@ void CTEMControlManager::set_spec_mag_index(float _fIndex)
 
 void CTEMControlManager::set_illumination_index(float _fIndex)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_index\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_index\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -492,7 +473,7 @@ void CTEMControlManager::set_illumination_index(float _fIndex)
 
 float CTEMControlManager::get_tem_magnification()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::GetTEMMagnification\n");
+	PRINTD("\t\tCTEMControlManager::GetTEMMagnification\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -511,7 +492,7 @@ float CTEMControlManager::get_tem_magnification()
 
 float CTEMControlManager::get_magnification_index()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_magnification_index\n");
+	PRINTD("\t\tCTEMControlManager::get_magnification_index\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -531,7 +512,7 @@ float CTEMControlManager::get_magnification_index()
 
 float CTEMControlManager::get_spec_mag_index()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_spec_mag_index\n");
+	PRINTD("\t\tCTEMControlManager::get_spec_mag_index\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -551,7 +532,7 @@ float CTEMControlManager::get_spec_mag_index()
 
 float CTEMControlManager::get_illumination_index()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_index(nm)\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_index(nm)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -570,7 +551,7 @@ float CTEMControlManager::get_illumination_index()
 
 float CTEMControlManager::get_illumination_angle()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_angle(nm)\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_angle(nm)\n");
 	
 	VARIANT _var;
 	ZeissErrorCode zeissRetCode = this->zeiss_read("AP_ILL_ANGLE", _var);
@@ -591,7 +572,7 @@ float CTEMControlManager::get_illumination_angle()
 
 float CTEMControlManager::get_spot_size(bool _bUpdate /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetSpotSize(nm)\n");
+    PRINTD("\t\tCTEMControlManager::GetSpotSize(nm)\n");
 	if (_bUpdate == false)
 		return m_fSpotSize;
 
@@ -615,7 +596,7 @@ float CTEMControlManager::get_spot_size(bool _bUpdate /*= false*/)
 
 float CTEMControlManager::get_camera_length(bool _bUpdate /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetCameraLength(mm)\n");
+    PRINTD("\t\tCTEMControlManager::GetCameraLength(mm)\n");
 	if (_bUpdate == false)
 		return m_fCameraLength;
     VARIANT _var;
@@ -639,7 +620,7 @@ float CTEMControlManager::get_camera_length(bool _bUpdate /*= false*/)
 int CTEMControlManager::get_ais_state()
 {
 	// 0 = OFF, 1 = AUTO, 2 = MANUAL
-	PRINTD("\t\t\t\tCTEMControlManager::get_ais_state\n");
+	PRINTD("\t\tCTEMControlManager::get_ais_state\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -659,7 +640,7 @@ int CTEMControlManager::get_ais_state()
 
 int CTEMControlManager::get_ais_num()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_ais_num\n");
+	PRINTD("\t\tCTEMControlManager::get_ais_num\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -679,7 +660,7 @@ int CTEMControlManager::get_ais_num()
 
 int CTEMControlManager::get_mis_num()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_mis_num\n");
+	PRINTD("\t\tCTEMControlManager::get_mis_num\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -699,7 +680,7 @@ int CTEMControlManager::get_mis_num()
 
 void CTEMControlManager::set_mis_num(int num)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_mis_num(...)\n");
+	PRINTD("\t\tCTEMControlManager::set_mis_num(...)\n");
 	if (this->get_ais_state() != 2) // MANUAL
 		return;
 
@@ -722,7 +703,7 @@ void CTEMControlManager::set_mis_num(int num)
 
 float CTEMControlManager::get_actual_emission_current(bool _bUpdate /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetEmissionCurrent\n");
+    PRINTD("\t\tCTEMControlManager::GetEmissionCurrent\n");
 	if (_bUpdate == false)
 		return m_fActualEmissionCurrent;
 
@@ -747,7 +728,7 @@ float CTEMControlManager::get_actual_emission_current(bool _bUpdate /*= false*/)
 
 int CTEMControlManager::get_actual_emission_step()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::GetActualEmissionStep\n");
+	PRINTD("\t\tCTEMControlManager::GetActualEmissionStep\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -766,7 +747,7 @@ int CTEMControlManager::get_actual_emission_step()
 
 float CTEMControlManager::get_illumination_shift_x()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_shift_x\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_shift_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -787,7 +768,7 @@ float CTEMControlManager::get_illumination_shift_x()
 
 float CTEMControlManager::get_illumination_shift_y()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_shift_y\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_shift_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -806,7 +787,7 @@ float CTEMControlManager::get_illumination_shift_y()
 
 void CTEMControlManager::get_illumination_shift_limits(float& _lowerLimitX, float& _upperLimitX, float& _lowerLimitY, float& _upperLimitY)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_shift_limits\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_shift_limits\n");
 	VARIANT _varMin, _varMax;
 
 	get_limits("AP_ILL_SHIFT_X", _varMin, _varMax);
@@ -820,7 +801,7 @@ void CTEMControlManager::get_illumination_shift_limits(float& _lowerLimitX, floa
 
 void CTEMControlManager::set_illumination_shift_x(float fShift)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_shift_x\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_shift_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -841,7 +822,7 @@ void CTEMControlManager::set_illumination_shift_x(float fShift)
 
 void CTEMControlManager::set_illumination_shift_y(float fShift)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_shift_y\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_shift_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -862,7 +843,7 @@ void CTEMControlManager::set_illumination_shift_y(float fShift)
 
 void CTEMControlManager::set_illumination_shift(float fShiftX, float fShiftY)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_shift\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_shift\n");
 
 	this->set_illumination_shift_x(fShiftX);
 	this->set_illumination_shift_y(fShiftY);
@@ -872,7 +853,7 @@ void CTEMControlManager::set_illumination_shift(float fShiftX, float fShiftY)
 
 float CTEMControlManager::get_image_shift_x()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_image_shift_x\n");
+	PRINTD("\t\tCTEMControlManager::get_image_shift_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -893,7 +874,7 @@ float CTEMControlManager::get_image_shift_x()
 
 float CTEMControlManager::get_image_shift_y()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_image_shift_y\n");
+	PRINTD("\t\tCTEMControlManager::get_image_shift_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -912,7 +893,7 @@ float CTEMControlManager::get_image_shift_y()
 
 float CTEMControlManager::get_illumination_tilt_x()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_tilt_x\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_tilt_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -931,7 +912,7 @@ float CTEMControlManager::get_illumination_tilt_x()
 
 float CTEMControlManager::get_illumination_tilt_y()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_tilt_y\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_tilt_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -951,7 +932,7 @@ float CTEMControlManager::get_illumination_tilt_y()
 
 float CTEMControlManager::get_illumination_stig_x()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_stig_x\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_stig_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -972,7 +953,7 @@ float CTEMControlManager::get_illumination_stig_x()
 
 float CTEMControlManager::get_illumination_stig_y()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_illumination_stig_y\n");
+	PRINTD("\t\tCTEMControlManager::get_illumination_stig_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -995,7 +976,7 @@ float CTEMControlManager::get_illumination_stig_y()
 
 void CTEMControlManager::set_image_shift_x(float fShift)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_image_shift_x\n");
+	PRINTD("\t\tCTEMControlManager::set_image_shift_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1016,7 +997,7 @@ void CTEMControlManager::set_image_shift_x(float fShift)
 
 void CTEMControlManager::set_image_shift_y(float fShift)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_image_shift_y\n");
+	PRINTD("\t\tCTEMControlManager::set_image_shift_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1037,7 +1018,7 @@ void CTEMControlManager::set_image_shift_y(float fShift)
 
 void CTEMControlManager::set_image_shift(float fShiftX, float fShiftY)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_image_shift\n");
+	PRINTD("\t\tCTEMControlManager::set_image_shift\n");
 
 	this->set_image_shift_x(fShiftX);
 	this->set_image_shift_y(fShiftY);
@@ -1047,7 +1028,7 @@ void CTEMControlManager::set_image_shift(float fShiftX, float fShiftY)
 
 void CTEMControlManager::set_illumination_tilt_x(float fTilt)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt_x\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_tilt_x\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1068,7 +1049,7 @@ void CTEMControlManager::set_illumination_tilt_x(float fTilt)
 
 void CTEMControlManager::set_illumination_tilt_y(float fTilt)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt_y\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_tilt_y\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1090,7 +1071,7 @@ void CTEMControlManager::set_illumination_tilt_y(float fTilt)
 
 void CTEMControlManager::set_illumination_tilt(float fTiltX, float fTiltY)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_illumination_tilt\n");
+	PRINTD("\t\tCTEMControlManager::set_illumination_tilt\n");
 
 	this->set_illumination_tilt_x(fTiltX);
 	this->set_illumination_tilt_y(fTiltY);
@@ -1098,7 +1079,7 @@ void CTEMControlManager::set_illumination_tilt(float fTiltX, float fTiltY)
 
 void CTEMControlManager::set_target_emission__step(float _fStep)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetTargetEmissionStep\n");
+	PRINTD("\t\tCTEMControlManager::SetTargetEmissionStep\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1119,7 +1100,7 @@ void CTEMControlManager::set_target_emission__step(float _fStep)
 
 float CTEMControlManager::get_defocus()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetDefocus\n");
+    PRINTD("\t\tCTEMControlManager::GetDefocus\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1138,7 +1119,7 @@ float CTEMControlManager::get_defocus()
 
 float CTEMControlManager::get_focus()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetFocus\n");
+    PRINTD("\t\tCTEMControlManager::GetFocus\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1158,7 +1139,7 @@ float CTEMControlManager::get_focus()
 
 void CTEMControlManager::set_focus(float focus_val)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_focus(nm)\n");
+	PRINTD("\t\tCTEMControlManager::set_focus(nm)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1179,7 +1160,7 @@ void CTEMControlManager::set_focus(float focus_val)
 
 float CTEMControlManager::get_stage_x()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStageX(meters)\n");
+    PRINTD("\t\tCTEMControlManager::GetStageX(meters)\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1198,7 +1179,7 @@ float CTEMControlManager::get_stage_x()
 
 float CTEMControlManager::get_stage_y()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStageY(meters)\n");
+    PRINTD("\t\tCTEMControlManager::GetStageY(meters)\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1217,7 +1198,7 @@ float CTEMControlManager::get_stage_y()
 
 float CTEMControlManager::get_stage_z(bool _bUpdate /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStageZ(meters)\n");
+    PRINTD("\t\tCTEMControlManager::GetStageZ(meters)\n");
 	if (_bUpdate == false)
 		return m_fStageZ;
 
@@ -1241,7 +1222,7 @@ float CTEMControlManager::get_stage_z(bool _bUpdate /*= false*/)
 
 float CTEMControlManager::get_stage_tilt_angle(bool _bUpdate /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStageT(Deg)\n");
+    PRINTD("\t\tCTEMControlManager::GetStageT(Deg)\n");
 
 	//if (_bUpdate == false)
 	//	return m_fCurrentTiltAngle;
@@ -1269,7 +1250,7 @@ float CTEMControlManager::get_stage_tilt_angle(bool _bUpdate /*= false*/)
 
 float CTEMControlManager::get_stage_m()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStageM(Deg)\n");
+    PRINTD("\t\tCTEMControlManager::GetStageM(Deg)\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1288,7 +1269,7 @@ float CTEMControlManager::get_stage_m()
 
 float CTEMControlManager::get_stage_tilt_speed()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::GetStageTSpeed(Deg)\n");
+	PRINTD("\t\tCTEMControlManager::GetStageTSpeed(Deg)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1307,7 +1288,7 @@ float CTEMControlManager::get_stage_tilt_speed()
 
 float CTEMControlManager::get_stage_xy_speed()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::GetStageXYSpeed(Deg)\n");
+	PRINTD("\t\tCTEMControlManager::GetStageXYSpeed(Deg)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1326,7 +1307,7 @@ float CTEMControlManager::get_stage_xy_speed()
 
 void CTEMControlManager::set_stage_x(float _fX)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageX(meters)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageX(meters)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1347,7 +1328,7 @@ void CTEMControlManager::set_stage_x(float _fX)
 
 void CTEMControlManager::set_stage_y(float _fY)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageY(meters)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageY(meters)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1368,7 +1349,7 @@ void CTEMControlManager::set_stage_y(float _fY)
 
 void CTEMControlManager::set_stage_z(float _fZ)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageZ(meters)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageZ(meters)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1390,7 +1371,7 @@ void CTEMControlManager::set_stage_z(float _fZ)
 
 void CTEMControlManager::set_stage_tilt_angle(float _fAng)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageT(Deg)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageT(Deg)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1411,7 +1392,7 @@ void CTEMControlManager::set_stage_tilt_angle(float _fAng)
 
 void CTEMControlManager::set_stage_tilt_delta(float _fDelta)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSTageTDelta(Deg)\n");
+	PRINTD("\t\tCTEMControlManager::SetSTageTDelta(Deg)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1432,7 +1413,7 @@ void CTEMControlManager::set_stage_tilt_delta(float _fDelta)
 
 void CTEMControlManager::set_stage_m(float _fAng)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageM(Deg)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageM(Deg)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1453,7 +1434,7 @@ void CTEMControlManager::set_stage_m(float _fAng)
 
 ZeissErrorCode CTEMControlManager::set_stage_tilt_speed(float _fSpeed)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageTSpeed(%)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageTSpeed(%)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1474,7 +1455,7 @@ ZeissErrorCode CTEMControlManager::set_stage_tilt_speed(float _fSpeed)
 
 ZeissErrorCode CTEMControlManager::set_stage_xy_speed(float _fSpeed)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetStageXYSpeed(%)\n");
+	PRINTD("\t\tCTEMControlManager::SetStageXYSpeed(%)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1493,7 +1474,7 @@ ZeissErrorCode CTEMControlManager::set_stage_xy_speed(float _fSpeed)
 
 bool CTEMControlManager::is_stage_busy(bool _bUpdate /*= false*/)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::isStageBusy(bool)\n");
+	PRINTD("\t\tCTEMControlManager::isStageBusy(bool)\n");
 	//if (_bUpdate == false)
 	//	return m_bIsStageBusy;
 
@@ -1518,7 +1499,7 @@ bool CTEMControlManager::is_stage_busy(bool _bUpdate /*= false*/)
 
 bool CTEMControlManager::is_stage_rotating(bool _bUpdate /*= false*/)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::isStageRotating(bool)\n");
+	PRINTD("\t\tCTEMControlManager::isStageRotating(bool)\n");
 	//if (_bUpdate == false)
 	//	return m_bIsStageRotating;
 
@@ -1544,7 +1525,7 @@ bool CTEMControlManager::is_stage_rotating(bool _bUpdate /*= false*/)
 
 float CTEMControlManager::get_sten_pixel_size()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetPixelSize(uM)\n");
+    PRINTD("\t\tCTEMControlManager::GetPixelSize(uM)\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1568,7 +1549,7 @@ int CTEMControlManager::get_beam_state()
     // 9 = Blanker9 | 10 =Blanker10  | 11 = Blanker11 | 12 = Blanker12
     // 13 = Blanker13 | 14 = Sample Holder | 15 = Gun Valve | 16 = X-Ray
     
-    PRINTD("\t\t\t\tCTEMControlManager::GetBeamState\n");
+    PRINTD("\t\tCTEMControlManager::GetBeamState\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1588,7 +1569,7 @@ int CTEMControlManager::get_beam_state()
 
 void CTEMControlManager::do_blank_beam(bool _blank)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetBeamBlankState(on/off)\n");
+	PRINTD("\t\tCTEMControlManager::SetBeamBlankState(on/off)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1627,7 +1608,7 @@ void CTEMControlManager::simulate_mdf(bool _bOn, TEMModeParameters* pTEMMode)
 
 float CTEMControlManager::get_spot_pos_x()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetSpotPosX\n");
+    PRINTD("\t\tCTEMControlManager::GetSpotPosX\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1646,7 +1627,7 @@ float CTEMControlManager::get_spot_pos_x()
 
 float CTEMControlManager::get_spot_pos_y()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetSpotPosY\n");
+    PRINTD("\t\tCTEMControlManager::GetSpotPosY\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1665,7 +1646,7 @@ float CTEMControlManager::get_spot_pos_y()
 
 float CTEMControlManager::get_width()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetWidth\n");
+    PRINTD("\t\tCTEMControlManager::GetWidth\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1684,7 +1665,7 @@ float CTEMControlManager::get_width()
 
 float CTEMControlManager::get_height()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetHeight\n");
+    PRINTD("\t\tCTEMControlManager::GetHeight\n");
 
     VARIANT _var;
     //ZM(_var);
@@ -1705,7 +1686,7 @@ float CTEMControlManager::get_height()
 
 void CTEMControlManager::set_stem_spot(bool bOn)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSTEMSpot(on/off)\n");
+	PRINTD("\t\tCTEMControlManager::SetSTEMSpot(on/off)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1727,7 +1708,7 @@ void CTEMControlManager::set_stem_spot(bool bOn)
 
 bool CTEMControlManager::is_stem_spot_on()
 {
-	PRINTD("\t\t\t\tCTEMFControlManager::isSTEMSpotOn(bool)\n");
+	PRINTD("\t\tCTEMFControlManager::isSTEMSpotOn(bool)\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -1749,7 +1730,7 @@ bool CTEMControlManager::is_stem_spot_on()
 
 bool CTEMControlManager::is_on_stem_mode()
 {
-	PRINTD("\t\t\t\tCTEMFControlManager::is_on_stem_mode(bool)\n");
+	PRINTD("\t\tCTEMFControlManager::is_on_stem_mode(bool)\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -1771,7 +1752,7 @@ bool CTEMControlManager::is_on_stem_mode()
 
 bool CTEMControlManager::is_stem_frozen()
 {
-	PRINTD("\t\t\t\tCTEMFControlManager::isSTEMFrozen(bool)\n");
+	PRINTD("\t\tCTEMFControlManager::isSTEMFrozen(bool)\n");
 	VARIANT _var;
 	//ZM(_var);
 	_var.vt = VT_R4;
@@ -1794,7 +1775,7 @@ bool CTEMControlManager::is_stem_frozen()
 
 void CTEMControlManager::freeze_stem_mode(bool _bFreeze)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::DoFreezeSTEMMode(on/off)\n");
+	PRINTD("\t\tCTEMControlManager::DoFreezeSTEMMode(on/off)\n");
 	if (Initialised() == false)
 		return;
 
@@ -1818,7 +1799,7 @@ void CTEMControlManager::freeze_stem_mode(bool _bFreeze)
 
 void CTEMControlManager::make_beam_parallel()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::DoParalellBeam\n");
+	PRINTD("\t\tCTEMControlManager::DoParalellBeam\n");
 	if (Initialised() == false || is_on_stem_mode() == false)
 		return;
 
@@ -1841,7 +1822,7 @@ void CTEMControlManager::make_beam_parallel()
 
 void CTEMControlManager::make_beam_convergent()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::DoParalellBeam\n");
+	PRINTD("\t\tCTEMControlManager::DoParalellBeam\n");
 	if (Initialised() == false || is_on_stem_mode() == false)
 		return;
 
@@ -1864,7 +1845,7 @@ void CTEMControlManager::make_beam_convergent()
 
 bool CTEMControlManager::is_beam_parallel()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::IsBeamParalell\n");
+	PRINTD("\t\tCTEMControlManager::IsBeamParalell\n");
 	
 	VARIANT _var;
 	//ZM(_var);
@@ -1884,7 +1865,7 @@ bool CTEMControlManager::is_beam_parallel()
 
 void CTEMControlManager::set_scanning_speed(short _Speed)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetScanningSpeed\n");
+	PRINTD("\t\tCTEMControlManager::SetScanningSpeed\n");
 
 	_Speed = std::clamp<short>(_Speed, 0, 15);
 	std::string sMsg = "CMD_SCANRATE";
@@ -1895,7 +1876,7 @@ void CTEMControlManager::set_scanning_speed(short _Speed)
 
 void CTEMControlManager::stage_abort_exec()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::stage_abort_exec\n");
+	PRINTD("\t\tCTEMControlManager::stage_abort_exec\n");
 
 
 
@@ -1904,7 +1885,7 @@ void CTEMControlManager::stage_abort_exec()
 
 void CTEMControlManager::set_spot_pos_x(float _x)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSpotPosX(pixels)\n");
+	PRINTD("\t\tCTEMControlManager::SetSpotPosX(pixels)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1925,7 +1906,7 @@ void CTEMControlManager::set_spot_pos_x(float _x)
 
 void CTEMControlManager::set_spot_pos_y(float _y)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSpotPosY(pixels)\n");
+	PRINTD("\t\tCTEMControlManager::SetSpotPosY(pixels)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -1946,7 +1927,7 @@ void CTEMControlManager::set_spot_pos_y(float _y)
 
 void CTEMControlManager::set_spot_pos(float _x, float _y)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::SetSpotPosY(pixels)\n");
+	PRINTD("\t\tCTEMControlManager::SetSpotPosY(pixels)\n");
     
     set_spot_pos_x(_x);
     set_spot_pos_y(_y);
@@ -1954,7 +1935,7 @@ void CTEMControlManager::set_spot_pos(float _x, float _y)
 
 int CTEMControlManager::get_large_screen_status()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::GetLargeScreenState\n");
+	PRINTD("\t\tCTEMControlManager::GetLargeScreenState\n");
     // 0 = Up | 1 = Down | 2 = Moving | 3 = Error
 
 	VARIANT _var;
@@ -1975,7 +1956,7 @@ int CTEMControlManager::get_large_screen_status()
 
 void CTEMControlManager::do_large_screen_up()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::DoLargeScreenUp\n");
+	PRINTD("\t\tCTEMControlManager::DoLargeScreenUp\n");
 
 	std::string sMsg = "CMD_LARGE_SCREEN_UP";
 
@@ -1984,7 +1965,7 @@ void CTEMControlManager::do_large_screen_up()
 
 void CTEMControlManager::do_large_screen_down()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::DoLargeScreenUp\n");
+	PRINTD("\t\tCTEMControlManager::DoLargeScreenUp\n");
 
 	std::string sMsg = "CMD_LARGE_SCREEN_DOWN";
 
@@ -1993,7 +1974,7 @@ void CTEMControlManager::do_large_screen_down()
 
 float CTEMControlManager::get_C1_lens()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_C1_lens\n");
+	PRINTD("\t\tCTEMControlManager::get_C1_lens\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2012,7 +1993,7 @@ float CTEMControlManager::get_C1_lens()
 
 float CTEMControlManager::get_C2_lens()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_C2_lens\n");
+	PRINTD("\t\tCTEMControlManager::get_C2_lens\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2031,7 +2012,7 @@ float CTEMControlManager::get_C2_lens()
 
 float CTEMControlManager::get_C3_lens()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_C3_lens\n");
+	PRINTD("\t\tCTEMControlManager::get_C3_lens\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2050,7 +2031,7 @@ float CTEMControlManager::get_C3_lens()
 
 float CTEMControlManager::get_objective_lens()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_objective_lens\n");
+	PRINTD("\t\tCTEMControlManager::get_objective_lens\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2069,7 +2050,7 @@ float CTEMControlManager::get_objective_lens()
 
 void CTEMControlManager::set_C1_lens(float _fVal)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_C1_lens(current)\n");
+	PRINTD("\t\tCTEMControlManager::set_C1_lens(current)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2090,7 +2071,7 @@ void CTEMControlManager::set_C1_lens(float _fVal)
 
 void CTEMControlManager::set_C2_lens(float _fVal)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_C2_lens(current)\n");
+	PRINTD("\t\tCTEMControlManager::set_C2_lens(current)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2111,7 +2092,7 @@ void CTEMControlManager::set_C2_lens(float _fVal)
 
 void CTEMControlManager::set_C3_lens(float _fVal)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_C3_lens(current)\n");
+	PRINTD("\t\tCTEMControlManager::set_C3_lens(current)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2132,7 +2113,7 @@ void CTEMControlManager::set_C3_lens(float _fVal)
 
 void CTEMControlManager::set_objective_lens(float _fVal)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::set_objective_lens(current)\n");
+	PRINTD("\t\tCTEMControlManager::set_objective_lens(current)\n");
 
 	VARIANT _var;
 	//ZM(_var);
@@ -2153,7 +2134,7 @@ void CTEMControlManager::set_objective_lens(float _fVal)
 
 void CTEMControlManager::do_calibrate_magnification()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_magnification\n");
+	PRINTD("\t\tCTEMControlManager::do_calibrate_magnification\n");
 
 	std::string sMsg = "CMD_CAL_MAG";
 
@@ -2162,7 +2143,7 @@ void CTEMControlManager::do_calibrate_magnification()
 
 void CTEMControlManager::do_calibrate_focus()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_focus\n");
+	PRINTD("\t\tCTEMControlManager::do_calibrate_focus\n");
 
 	std::string sMsg = "CMD_CAL_FOCUS";
 
@@ -2171,7 +2152,7 @@ void CTEMControlManager::do_calibrate_focus()
 
 void CTEMControlManager::do_calibrate_all()
 {
-	PRINTD("\t\t\t\tCTEMControlManager::do_calibrate_all\n");
+	PRINTD("\t\tCTEMControlManager::do_calibrate_all\n");
 
 	std::string sMsg = "CMD_CAL_ALL";
 
@@ -2180,7 +2161,7 @@ void CTEMControlManager::do_calibrate_all()
 
 ZeissErrorCode CTEMControlManager::close_control(bool _bPrintErrMsg /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::CloseControl\n");
+    PRINTD("\t\tCTEMControlManager::CloseControl\n");
     if (Initialised() == false)
         return API_E_NOT_INITIALISED;
     ZeissErrorCode zeissRetCode = static_cast<ZeissErrorCode>(m_pZeissApi->ClosingControl());
@@ -2192,7 +2173,7 @@ ZeissErrorCode CTEMControlManager::close_control(bool _bPrintErrMsg /*= false*/)
 
 ZeissErrorCode CTEMControlManager::update_stage_position(bool _bPrintErrMsg /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetStagePosition\n");
+    PRINTD("\t\tCTEMControlManager::GetStagePosition\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (Initialised() == false)
         return zeissRetCode;
@@ -2211,7 +2192,7 @@ ZeissErrorCode CTEMControlManager::move_stage(float _x, float _y, float _z, floa
 {
     // For now, we expect the caller to give the coordinates in MICRONS.
 
-    PRINTD("\t\t\t\tCTEMControlManager::MoveStage\n");
+    PRINTD("\t\tCTEMControlManager::MoveStage\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (Initialised() == false)
         return zeissRetCode;
@@ -2232,7 +2213,7 @@ ZeissErrorCode CTEMControlManager::move_stage(float _x, float _y, float _z, floa
 
 void CTEMControlManager::acquire_tem_image(std::string& _fileName, unsigned int& _iNameIndex, int _exposureTime)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::acquire_tem_image\n");
+	PRINTD("\t\tCTEMControlManager::acquire_tem_image\n");
 
 	char cBuff[0x10];
 	sprintf_s(cBuff, 0x10, "_%03d.tiff", _iNameIndex);
@@ -2246,7 +2227,7 @@ void CTEMControlManager::acquire_tem_image(std::string& _fileName, unsigned int&
 
 ZeissErrorCode CTEMControlManager::acquire_stem_image(std::string& _fileName, unsigned int& _iNameIndex, bool _bTiffFile /*= true*/, bool _bPrintErrMsg /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::AcquireSTEMImage\n");
+    PRINTD("\t\tCTEMControlManager::AcquireSTEMImage\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (this->Initialised() == false)
         return zeissRetCode;
@@ -2269,7 +2250,7 @@ ZeissErrorCode CTEMControlManager::acquire_stem_image(std::string& _fileName, un
 
 ZeissErrorCode CTEMControlManager::zeiss_read(CString _usrMsg, VARIANT& _var, bool _bPrintErrMsg /*= false*/, bool _bPrintType /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::Read\n");
+    PRINTD("\t\tCTEMControlManager::Read\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (Initialised() == false)
         return zeissRetCode;
@@ -2292,7 +2273,7 @@ ZeissErrorCode CTEMControlManager::zeiss_read(CString _usrMsg, VARIANT& _var, bo
 
 ZeissErrorCode CTEMControlManager::zeiss_write(CString _usrMsg, VARIANT& _var, bool _bPrintErrMsg /*= false*/, bool _bPrintType /*= false*/)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::Write\n");
+    PRINTD("\t\tCTEMControlManager::Write\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (Initialised() == false)
         return zeissRetCode;
@@ -2310,7 +2291,7 @@ ZeissErrorCode CTEMControlManager::zeiss_write(CString _usrMsg, VARIANT& _var, b
 
 ZeissErrorCode CTEMControlManager::zeiss_execute(CString _usrMsg)
 {
-    PRINTD("\t\t\t\tCTEMControlManager::Execute\n");
+    PRINTD("\t\tCTEMControlManager::Execute\n");
     ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
     if (Initialised() == false)
         return zeissRetCode;
@@ -2324,7 +2305,7 @@ ZeissErrorCode CTEMControlManager::zeiss_execute(CString _usrMsg)
 
 ZeissErrorCode CTEMControlManager::get_limits(CString _usrMsg, VARIANT& _lowerLimit, VARIANT& _upperLimit)
 {
-	PRINTD("\t\t\t\tCTEMControlManager::get_limits\n");
+	PRINTD("\t\tCTEMControlManager::get_limits\n");
 	ZeissErrorCode zeissRetCode = API_E_NOT_INITIALISED;
 	if (Initialised() == false)
 		return zeissRetCode;
@@ -2337,7 +2318,7 @@ ZeissErrorCode CTEMControlManager::get_limits(CString _usrMsg, VARIANT& _lowerLi
 
 CTEMControlManager* CTEMControlManager::GetInstance()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::GetInstance\n");
+    PRINTD("\t\tCTEMControlManager::GetInstance\n");
     if (m_pZeissControlManager == nullptr)
         m_pZeissControlManager = new CTEMControlManager();
 
@@ -2346,7 +2327,7 @@ CTEMControlManager* CTEMControlManager::GetInstance()
 
 CTEMControlManager::~CTEMControlManager()
 {
-    PRINTD("\t\t\t\tCTEMControlManager::~CTEMControlManager - Destructor\n");
+    PRINTD("\t\tCTEMControlManager::~CTEMControlManager - Destructor\n");
     
 	if (m_pZeissApi) // Equivalent to SAFE_RELEASE
     {

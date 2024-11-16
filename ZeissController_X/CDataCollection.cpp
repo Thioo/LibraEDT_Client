@@ -8,6 +8,7 @@
 
 
 CDataCollection* CDataCollection::m_pZeissDataCollection = nullptr;
+
 std::vector<GridRegions> CDataCollection::gridRegions;
 
 
@@ -20,7 +21,7 @@ m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCal
 
 
 {
-	PRINTD("\t\t\t\tCDataCollection::CDataCollection() - Constructor\n");
+	PRINTD("\t\tCDataCollection::CDataCollection() - Constructor\n");
 	static bool bDoOnce = false;
 	if (bDoOnce == false)
 	{
@@ -32,6 +33,7 @@ m_iImageBasedTrackingMode(MODE_TIME_BASED), m_pTimepix(nullptr), m_fBeamShiftCal
 		m_pStage = m_pZeissControlManager->m_pStage;
 		ZM(m_oTrackingTimer);
 		ZM(m_oRecordTimer);
+		m_pCheetahPeakFinder = nullptr;
 
 		m_fRecordSTEMMagnification = 4000.0f;
 		
@@ -110,16 +112,17 @@ void CDataCollection::do_fill_eucentric_height_regions(std::vector<ImagesInfo>& 
 
 CDataCollection::~CDataCollection()
 {
-	PRINTD("\t\t\t\tCDataCollection::~CDataCollection() - Destructor\n");
+	PRINTD("\t\tCDataCollection::~CDataCollection() - Destructor\n");
 	
 	SAFE_RELEASE(m_pFile);
 	SAFE_RELEASE(m_pTimepix);
+	SAFE_RELEASE(m_pCheetahPeakFinder);
 }
 
 
 void CDataCollection::do_find_eucentric_height_regions_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoFindEucentricHeightsEx()\n");
+	PRINTD("\t\tCDataCollection::DoFindEucentricHeightsEx()\n");
 
 	std::thread t(&CDataCollection::do_find_eucentric_height, this);
 	t.join(); // t.detach() instead, if window not responding is annoying
@@ -127,7 +130,7 @@ void CDataCollection::do_find_eucentric_height_regions_ex()
 
 void CDataCollection::do_record_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoRecordEx()\n");
+	PRINTD("\t\tCDataCollection::DoRecordEx()\n");
 
 	if (m_pZeissControlManager->is_stage_rotating() == false)
 	{	
@@ -146,9 +149,6 @@ void CDataCollection::do_record_ex()
 			t1.detach();
 		} 
 		this->do_record_crystal_coordinates();
-		//std::thread t2(&CDataCollection::do_record_crystal_coordinates, this);
-		//t2.detach(); //t2.join(); // t.detach() instead, if window not responding is annoying
-		//printf("do_record_crystal_coordinates thread joined! YOU CAN NOW TRY DETACH\nOptionally, call record_ex on a new thread, and call do_Record_crystal_coords in this new thread.\n");
 
 	}
 	else
@@ -161,7 +161,7 @@ void CDataCollection::do_record_ex()
 
 void CDataCollection::do_track_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoTrackEx()\n");
+	PRINTD("\t\tCDataCollection::DoTrackEx()\n");
 
 	if (m_bTrackCrystalPath)
 	{
@@ -214,36 +214,10 @@ void CDataCollection::do_track_ex()
 }
 
 
-void CDataCollection::do_collect_frames_ex()
-{
-	PRINTD("\t\t\t\tCDataCollection::DoCollectFramesEx()\n");
-	if(m_bOnDataCollection == false)
-	{
-		m_bOnDataCollection = true;
-
-		if(m_bTrackCrystalPath)
-		{
-			m_bCanStartCollecting = false;
-			std::thread t(&CDataCollection::do_track_ex, this);
-			t.detach();
-		}
-		else
-			m_bCanStartCollecting = true;
-		
-		std::thread t1(&CDataCollection::do_collect_frames, this);
-		t1.detach();
-
-		std::thread t2(&CDataCollection::do_live_stream_collected_frames, this);
-		t2.detach();
-
-	}
-	else
-		PRINT("Already in CollectFrames(), maybe start rotating...");
-}
 
 void CDataCollection::tcp_do_collect_frames_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoCollectFramesEx()\n");
+	PRINTD("\t\tCDataCollection::DoCollectFramesEx()\n");
 	if (m_bOnDataCollection == false)
 	{
 		m_bOnDataCollection = true;
@@ -270,7 +244,7 @@ void CDataCollection::tcp_do_collect_frames_ex()
 
 void CDataCollection::infinite_loop_for_monitoring_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::DataCollectionMainLoopEx()\n");
+	PRINTD("\t\tCDataCollection::DataCollectionMainLoopEx()\n");
 	// NO LONGER USED
 	return;
 
@@ -281,122 +255,6 @@ void CDataCollection::set_control_manager(CTEMControlManager* _pCtrlMgr)
 	m_pZeissControlManager = _pCtrlMgr;
 }
 
-void CDataCollection::Test()
-{
-	PRINTD("\t\t\t\tCDataCollection::Test()\n");
-	
-	m_oEucentricHeightsSecondImgsVec.clear();
-	m_oEucentricHeightsFirstImgsVec.clear();
-	m_oFirstRegionVec.clear();
-	m_oSecondRegionVec.clear();
-	ImagesInfo imgInf;
-	imgInf._fZHeightVal = 0;
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_000.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_001.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_002.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_003.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_004.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg_005.tiff";
-	m_oEucentricHeightsFirstImgsVec.push_back(imgInf);
-
-	imgInf._fZHeightVal = 5;
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_000.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_001.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_002.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_003.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_004.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-	imgInf._sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg_005.tiff";
-	m_oEucentricHeightsSecondImgsVec.push_back(imgInf);
-
-
-
-	display_images_and_calculate_z_value();
-
-	//CImageManager* pImgMgr = CImageManager::GetInstance();
-	//pImgMgr->DisplayImageEx(&m_oEucentricHeightsFirstImgsVec);
-	//pImgMgr->DisplayImageEx(&m_oEucentricHeightsSecondImgsVec);
-
-	//DoFillEucentricHeightRegions(m_oEucentricHeightsFirstImgsVec, m_oFirstRegionVec);
-	//DoFillEucentricHeightRegions(m_oEucentricHeightsSecondImgsVec, m_oSecondRegionVec); 
-	//DoCalculateZValue(m_oEucentricHeightsFirstImgsVec, m_oEucentricHeightsSecondImgsVec, m_oFirstRegionVec, m_oSecondRegionVec);
-
-	///* For Testing Purposes */
-	//int _invalidRegion = 0;
-	//for (auto& v : m_oFirstRegionVec)
-	//{
-	//	if (v.bRegionValid == false)
-	//	{
-	//		_invalidRegion++;
-	//		printf("Invalid Region: Start(%.2f) | End(%.2f)\n", v.fRegionStart, v.fRegionEnd);
-	//		continue;
-	//	}
-	//	printf("Region: (%s) -> (%s) -- CalculatedZValue (%.3f)\n", v.oFirstImgName.c_str(), v.oSecondImgName.c_str(), v.fCalculatedZHeight);
-	//}
-	//WAIT();
-
-
-	return;
-	std::vector<ImagesInfo> imgFirst, imgSecond;
-	std::vector<EucentricHeightRegion> regionFirst, regionSecond;
-	
-	ImagesInfo img;
-	EucentricHeightRegion region;
-
-	img._bIsImgValid = true;
-	img._iPosY = 384;
-	imgFirst.emplace_back(img);
-	img._iPosY = 599;
-	imgFirst.emplace_back(img);
-	region.fGivenZHeight = 30;
-	regionFirst.emplace_back(region);
-
-	img._iPosY = 384;
-	imgSecond.emplace_back(img);
-	img._iPosY = 533;
-	imgSecond.emplace_back(img);
-	region.fGivenZHeight = 40;
-	regionSecond.emplace_back(region);
-
-	img._bIsImgValid = false;
-	imgFirst.emplace_back(img);
-	regionFirst.emplace_back(region);
-	//imgFirst.push_back(img);
-	imgSecond.emplace_back(img);
-	regionSecond.emplace_back(region);
-
-//	imgSecond.push_back(img);
-
-
-	img._bIsImgValid = true;
-	img._iPosY = 384;
-	imgFirst.emplace_back(img);
-	regionFirst.emplace_back(region);
-	img._iPosY = 555;
-	imgFirst.emplace_back(img);
-	region.fGivenZHeight = 60;
-	regionFirst.emplace_back(region);
-
-	img._iPosY = 384;
-	imgSecond.emplace_back(img);
-	regionSecond.emplace_back(region);
-	img._iPosY = 359;
-	imgSecond.emplace_back(img);
-	region.fGivenZHeight = 55;
-	regionSecond.emplace_back(region);
-
-	do_calculate_z_value(imgFirst, imgSecond, regionFirst, regionSecond);
-
-}
 
 bool CDataCollection::is_data_collection_direction_positive()
 {
@@ -410,7 +268,7 @@ bool CDataCollection::is_data_collection_direction_positive()
 
 void CDataCollection::do_find_eucentric_height()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoFindEucentricHeights()\n");
+	PRINTD("\t\tCDataCollection::DoFindEucentricHeights()\n");
 	// Z height changes as we go to high tilt angles
 	// So I'm trying to find different Z values for different tilt ranges
 	// and later on smoothly transition from one to another as we're tilting
@@ -457,10 +315,8 @@ void CDataCollection::do_find_eucentric_height()
 
 void CDataCollection::do_find_eucentric_height_single_run()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoFindEucentricHeightsSingleRun()\n");
+	PRINTD("\t\tCDataCollection::DoFindEucentricHeightsSingleRun()\n");
 	
-	//std::string oFileNameFirst = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg";
-	//std::string oFileNameSecond = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg";
 	std::string oFileNameFirst = m_pZeissDataCollection->m_sEucentricHeightPath + "Z_Img_1st";
 	std::string oFileNameSecond = m_pZeissDataCollection->m_sEucentricHeightPath + "Z_Img_2nd";
 
@@ -517,7 +373,7 @@ void CDataCollection::do_find_eucentric_height_single_run()
 
 void CDataCollection::do_find_eucentrigh_height_double_run()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoFindEucentricHeightsDoubleRun()\n");
+	PRINTD("\t\tCDataCollection::DoFindEucentricHeightsDoubleRun()\n");
 
 	//std::string oFileNameFirst = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_1stImg";
 	//std::string oFileNameSecond = "C:/Users/TEM/Documents/Moussa_SoftwareImages/EucentricHeight/EucentricHeight_2ndImg";
@@ -589,7 +445,7 @@ void CDataCollection::do_find_eucentrigh_height_double_run()
 
 void CDataCollection::do_calculate_z_value(std::vector<ImagesInfo>& _imgInfoFirst, std::vector<ImagesInfo>& _imgInfoSecond, std::vector<EucentricHeightRegion>& _imgRegionFirst, std::vector<EucentricHeightRegion>& _imgRegionSecond)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoCalculateZValue()\n");
+	PRINTD("\t\tCDataCollection::DoCalculateZValue()\n");
 	if ((_imgRegionFirst.size() != _imgRegionSecond.size()) || (_imgInfoFirst.size() != _imgInfoSecond.size()))
 		return;
 
@@ -618,7 +474,7 @@ void CDataCollection::do_calculate_z_value(std::vector<ImagesInfo>& _imgInfoFirs
 
 void CDataCollection::display_images_and_calculate_z_value()
 {
-	PRINTD("\t\t\t\tCDataCollection::ShowImagesAndCalculateZValue()\n");
+	PRINTD("\t\tCDataCollection::ShowImagesAndCalculateZValue()\n");
 
 	if (m_oEucentricHeightsFirstImgsVec.empty() || m_oEucentricHeightsSecondImgsVec.empty())
 	{
@@ -714,7 +570,7 @@ double CDataCollection::angleBetweenVectors(cv::Point2d v1, cv::Point2d v2) {
 
 void CDataCollection::do_calibrate_beam_shift_tem_ex()
 {
-	PRINTD("\t\t\t\tCDataCollection::do_calibrate_beam_shift_tem_ex()\n");
+	PRINTD("\t\tCDataCollection::do_calibrate_beam_shift_tem_ex()\n");
 
 	std::thread t(&CDataCollection::do_calibrate_beam_shift_tem, this);
 	t.join();
@@ -771,28 +627,6 @@ cv::Point2f CDataCollection::estimate_current_beam_coordinates()
 	return beamCoords;
 
 
-	/*cv::Point2f beamCoords(0,0);
-
-	if (m_bBeamShiftCalibrated == false)
-		return beamCoords;
-
-
-	float curr_ill_x = m_pZeissControlManager->get_illumination_shift_x();
-	float curr_ill_y = m_pZeissControlManager->get_illumination_shift_y();
-	cv::Point2f targ = cv::Point2f(-curr_ill_x, -curr_ill_y);
-
-	float startingPos_angle_X = angleBetweenVectors(targ, cv::Point2f(1.0f, 0.0f));
-	float startingPos_angle_Y = angleBetweenVectors(targ, cv::Point2f(0.0f, 1.0f));
-
-	float vec_len = sqrt(curr_ill_x * curr_ill_x * m_fBeamShiftCalibrationX * m_fBeamShiftCalibrationX + curr_ill_y * curr_ill_y * m_fBeamShiftCalibrationY * m_fBeamShiftCalibrationY);
-	beamCoords.x = vec_len * cos(startingPos_angle_X) + 512.0f;
-	beamCoords.y = vec_len * cos(startingPos_angle_Y) * -1.0f;
-
-	beamCoords.x += ImagesInfo::_radius;
-	beamCoords.y += ImagesInfo::_radius;
-
-	printf("Calculated beam coordinates: (%.f, %.f)\n", beamCoords.x, beamCoords.y);
-	return beamCoords;*/
 }
 
 
@@ -851,12 +685,6 @@ void CDataCollection::do_beam_shift_at_coordinates(cv::Point2f& _targetPos, cv::
 	}
 
 
-	// this problem below is now solved
-	
-	//if (std::_Is_nan(toShiftX) || std::_Is_nan(toShiftY) ||
-	//	std::_Is_nan(_ill_shift_vec_init.x) || std::_Is_nan(_ill_shift_vec_final.y) ||
-	//	std::_Is_nan(_ill_shift_vec_final.x) || std::_Is_nan(_ill_shift_vec_final.y))
-	//	printf("One of the important parameters returned is_nan");
 }
 
 
@@ -1207,7 +1035,7 @@ float CDataCollection::get_beam_calibration_x()
 
 void CDataCollection::do_record_crystal_coordinates()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoRecord()\n");
+	PRINTD("\t\tCDataCollection::DoRecord()\n");
 	
 	
 	m_oImageBasedVec.clear();
@@ -1282,7 +1110,7 @@ void CDataCollection::do_readjust_z_value()
 {
 
 	// We Assume that all the regions are valid
-	PRINTD("\t\t\t\tCDataCollection::DoReAdjustZValue() -- Starting Thread");
+	PRINTD("\t\tCDataCollection::DoReAdjustZValue() -- Starting Thread");
 
 	if (m_oFirstRegionVec.empty() || m_oSecondRegionVec.empty())
 	{
@@ -1368,14 +1196,14 @@ void CDataCollection::do_readjust_z_value()
 				
 	} 
 	
-	PRINTD("\t\t\t\tCDataCollection::DoReAdjustZValue() -- Exiting thread");
+	PRINTD("\t\tCDataCollection::DoReAdjustZValue() -- Exiting thread");
 }
 
 void CDataCollection::do_continuous_record_stem(CTimer& oTimer)
 {
 	//PRINT("do_continuous_record_stem no longer used!");
 	return;
-	PRINTD("\t\t\t\tCDataCollection::DoContinuousRecord()");
+	PRINTD("\t\tCDataCollection::DoContinuousRecord()");
 	m_oTimerBasedMap.clear();
 	m_oAngleBasedMap.clear();
 	m_oContinuousRecordVec.clear();
@@ -1424,7 +1252,7 @@ void CDataCollection::do_continuous_record_stem(CTimer& oTimer)
 
 void CDataCollection::do_image_based_record_stem(/*CTimer& _oTimer*/)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedRecord()");
+	PRINTD("\t\tCDataCollection::DoImageBasedRecord()");
 	// TODO: OPTIMIZE
 
 	ImagesInfo oImgInfo;
@@ -1535,7 +1363,7 @@ void CDataCollection::do_prepare_data_for_tracking()
 	{
 		PRINT("No images to prepare the data for tracking!");
 		return;
-	}else if(m_oImageBasedVec[0]._bIsImgValid == false) // No idea why...
+	}else if(m_oImageBasedVec[0]._bIsImgValid == false) // No longer remember why...
 	{
 		// Lets make sure that the user knows that the first image SHOULD be valid. Again, I don't remember why I have this requirement here.
 		PRINT("First image is invalid, cannot prepare the data for tracking!");
@@ -1664,114 +1492,10 @@ void CDataCollection::do_prepare_data_for_tracking()
 	
 }
 
-// void CDataCollection::do_track_crystal_coordinates_original()
-// {
-// 	PRINTD("\t\t\t\tCDataCollection::DoTrack()\n");
-// 
-// 	if (this->is_on_stem_mode())
-// 		m_pZeissControlManager->set_stem_magnification(m_fRecordSTEMMagnification);
-// 	else
-// 	{
-// 		std::vector<ImagesInfo>	_initialImgVec;
-// 		ImagesInfo imgsInfo;
-// 
-// 		m_oImagingParams.RestoreCurrentParameters(PARAM_IMAGING);
-// 
-// 		m_pZeissControlManager->do_blank_beam(false);
-// 		std::this_thread::sleep_for(300ms);
-// 		std::string imgName = this->m_sTrackingImgPath + "_initial_Img";
-// 		unsigned int idx = 0;
-// 		m_pZeissControlManager->acquire_tem_image(imgName, idx);
-// 		imgsInfo._sFileName = imgName;
-// 		imgsInfo._bSaveVisuals = true;
-// 		imgsInfo._bIsShowCrystalPath = true;
-// 		_initialImgVec.push_back(imgsInfo);
-// 
-// 		m_oDiffractionParams.RestoreCurrentParameters(PARAM_DIFFRACTION);
-// 
-// 		if (m_pZeissControlManager->get_image_mode() == DIFFRACTION_MODE)
-// 		{
-// 			m_pZeissControlManager->set_image_mode(IMAGE_MODE);
-// 			std::this_thread::sleep_for(250ms);
-// 		}
-// 
-// 		imgName = this->m_sTrackingImgPath + "_probe_Img";
-// 		idx = 0;
-// 		m_pZeissControlManager->acquire_tem_image(imgName, idx);
-// 		//imgsInfo._sFileName = imgName;
-// 		//_initialImgVec.push_back(imgsInfo);
-// 
-// 		CImageManager::GetInstance()->display_image_ex(&_initialImgVec, TEM_TRACKING);
-// 		
-// 		m_oDiffractionParams.RestoreCurrentParameters(PARAM_DIFFRACTION);
-// 
-// 		//m_targetPosNew = cv::Point2f(_initialImgVec.at(1)._iPosX, _initialImgVec.at(1)._iPosY);
-// 		m_targetPosNew = cv::Point2f(_initialImgVec.at(0)._iPosX, _initialImgVec.at(0)._iPosY);
-// 		cv::Point2f dummy1, dummy2;
-// 		do_beam_shift_at_coordinates(m_targetPosNew, nullptr, dummy1, dummy2, true);
-// 		//this->do_set_current_beam_screen_coordinates(_initialImgVec.at(0)._iPosX, _initialImgVec.at(0)._iPosY);
-// 
-// 		cv::Point2f targetPosOld = cv::Point2f(m_oImageBasedVec[0]._iPosX, m_oImageBasedVec[0]._iPosY);
-// 		cv::Point shift_offset = m_targetPosNew - targetPosOld;
-// 
-// 		
-// 		do_fill_crystal_coordinates_vec();
-// 		for (int i = 0; i < m_oCrystalPathCoordinates.size(); i++)
-// 		{
-// 			m_oCrystalPathCoordinates[i].x += shift_offset.x;
-// 			m_oCrystalPathCoordinates[i].y += shift_offset.y; 
-// 			
-// 			m_oCrystalPathCoordinatesSwapped[i].y += shift_offset.x;
-// 			m_oCrystalPathCoordinatesSwapped[i].x += shift_offset.y;
-// 
-// 		}
-// 	}
-// 
-// 	m_bCanStartCollecting = true;
-// 	// 2. Start rotating (check that the goniometer started rotating)
-// 	while (m_pZeissControlManager->is_stage_rotating() == false && m_bOnRotateRequest == false)
-// 	{
-// 		std::this_thread::sleep_for(5ms);
-// 		if(do_check_for_emergency_exit())
-// 		{
-// 			m_bOnDataCollection = false;
-// 			return;
-// 		}
-// 	}
-// 	
-// 	if(m_oTrackingTimer.isReset()) // In case the user has started rotating on his own
-// 		m_oTrackingTimer.doStart();
-// 	printf("Tracking Loop entered after: %d ms\n", m_oTrackingTimer.returnElapsed());
-// 
-// 	auto t1_time = m_oTrackingTimer.returnElapsed();
-// 	auto t1_angle = m_pStage->get_current_tilt_angle();
-// 
-// 	if(this->is_on_stem_mode())
-// 	{
-// 		//if (m_bTimeBasedTrack)
-// 		//	do_timer_based_continuous_track_stem();
-// 		//else if (m_bAngleBasedTrack)
-// 		//	do_angle_based_continuous_track_stem();
-// 		//else if (m_bImageBasedTrack)
-// 		if (m_bImageBasedTrack)
-// 			do_image_based_track_stem2(t1_angle, m_iImageBasedTrackingMode);
-// 	}
-// 	else
-// 	{
-// 		if (m_bImageBasedTrack)
-// 			do_image_based_track_tem(t1_angle, m_iImageBasedTrackingMode);
-// 	}
-// 
-// 	m_oTrackingTimer.doEnd();
-// 	printf("The whole tracking session took: %d seconds\n", m_oTrackingTimer.returnTotalElapsed() / 1000);
-// 	m_oTrackingTimer.doReset();
-// 
-// 	m_bEnable_items = true;
-// }
 
 void CDataCollection::do_track_crystal_coordinates()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoTrack()\n");
+	PRINTD("\t\tCDataCollection::DoTrack()\n");
 
 	{
 		std::vector<ImagesInfo>	_initialImgVec;
@@ -1802,7 +1526,7 @@ void CDataCollection::do_track_crystal_coordinates()
 		else
 		{
 			m_oImagingParams.RestoreCurrentParameters(PARAM_IMAGING);
-			
+			std::this_thread::sleep_for(500ms);
 			std::string imgName = this->m_sTrackingImgPath + "_initial_TEM_Img";
 			unsigned int idx = 0;
 			m_pZeissControlManager->acquire_tem_image(imgName, idx);
@@ -1958,7 +1682,7 @@ void CDataCollection::do_crystal_tracking_correction()
 
 void CDataCollection::do_image_based_record_tem(/*CTimer& _oTimer*/)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedRecord()");
+	PRINTD("\t\tCDataCollection::DoImageBasedRecord()");
 	// TODO: OPTIMIZE
 
 	ImagesInfo oImgInfo;
@@ -2049,7 +1773,7 @@ void CDataCollection::do_image_based_record_tem(/*CTimer& _oTimer*/)
 
 void CDataCollection::do_image_based_record_tem_steps()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedRecord()");
+	PRINTD("\t\tCDataCollection::DoImageBasedRecord()");
 	// TODO: OPTIMIZE
 
 	ImagesInfo oImgInfo;
@@ -2133,7 +1857,7 @@ void CDataCollection::do_fill_image_based_vector_tem(ImagesInfo& oImgInfo, CTime
 		//m_pZeissControlManager->do_blank_beam(false);
 		//while (m_pZeissControlManager->get_beam_state() == 1)
 		//	std::this_thread::sleep_for(5ms);
-		std::this_thread::sleep_for(500ms);
+		std::this_thread::sleep_for(700ms);
 	}
 	// It is up to the caller to make sure that the m_oImageBaseVec is cleared.
 	this->m_pZeissControlManager->acquire_tem_image(sFileName, imgCount);
@@ -2197,7 +1921,7 @@ void CDataCollection::do_angle_based_continuous_track_stem()
 {
 	//PRINT("do_angle_based_continuous_track_stem no longer used!");
 	return;
-	PRINTD("\t\t\t\tCDataCollection::DoAngleBasedContinuousTrack()");
+	PRINTD("\t\tCDataCollection::DoAngleBasedContinuousTrack()");
 	if (m_oAngleBasedMap.empty())
 	{
 		PRINT("Angle Based Tracking undoable. No data recorded!");
@@ -2235,7 +1959,7 @@ void CDataCollection::do_timer_based_continuous_track_stem()
 {
 	//PRINT("do_timer_based_continuous_track_stem no longer used!");
 	return;
-	PRINTD("\t\t\t\tCDataCollection::DoTimeBasedContinuousTrack()");
+	PRINTD("\t\tCDataCollection::DoTimeBasedContinuousTrack()");
 	if (m_oTimerBasedMap.empty())
 	{
 		PRINT("Timer Based Tracking undoable. No data recorded!");
@@ -2272,7 +1996,7 @@ void CDataCollection::do_timer_based_continuous_track_stem()
 
 void CDataCollection::do_linear_movement_for_continuous_rec_stem(TrackingMode _Mode)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoLinearMovementForContinuousRec()");
+	PRINTD("\t\tCDataCollection::DoLinearMovementForContinuousRec()");
 
 	// TODO: Clean this part of the code, the two possible modes can be made into a single function.
 
@@ -2356,7 +2080,7 @@ void CDataCollection::do_linear_movement_for_continuous_rec_stem(TrackingMode _M
 
 void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _Mode)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
+	PRINTD("\t\tCDataCollection::DoImageBasedTrack()");
 	PRINT("REMOVE LATER: TRY THE SPINE INTERPOLATION METHOD INSTEAD OF THIS LINEAR ONE");
 
 	if (m_oTrackingDataVec.empty())
@@ -2446,9 +2170,9 @@ void CDataCollection::do_image_based_track_tem(float& _t1_angle, TrackingMode _M
 
 void CDataCollection::do_image_based_track_tem_spline(float& _t1_angle, TrackingMode _Mode)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
-	if (m_oTrackingDataVec.empty()) // We no longer need this check here for the spline interpolation method. But we keep it here for now, just in case...
-		return;
+	PRINTD("\t\tCDataCollection::DoImageBasedTrack()");
+	//if (m_oTrackingDataVec.empty()) // We no longer need this check here for the spline interpolation method. But we keep it here for now, just in case...
+	//	return;
 
 	while(true)
 	{
@@ -2470,105 +2194,27 @@ void CDataCollection::do_image_based_track_tem_spline(float& _t1_angle, Tracking
 		std::this_thread::sleep_for(5ms);
 		if(static_cast<unsigned int>(xnow(0)) > m_oTrackingDataVec.back().uiTime)
 			break;
-		if (do_check_for_emergency_exit() || (static_cast<unsigned int>(xnow(0)) > 5000 && m_pStage->is_stage_busy() == false))
+		if (do_check_for_emergency_exit())
 		{
-			PRINT("BREAKING HERE");
-			if (m_pStage->is_stage_busy() == false)
-				PRINT("STAGE IS NOT BUSY...");
+			PRINT("Aborting Tracking...");
+			break;
+		} 
+		
+		if(static_cast<unsigned int>(xnow(0)) > 5000 && m_pStage->is_stage_busy() == false)
+		{
+
+			PRINT("BREAKING HERE, STAGE IS IDLE");
 			break;
 		}
-
+		
 	}
-
-
-
-
-
-
-	/*// We loop through the tracking data and move the beam to the target position
-	for (int i = 1; i < m_oTrackingDataVec.size(); i++)
-	{
-		auto now = m_oTrackingTimer.returnElapsed();
-		auto vCurrPos = m_oTrackingDataVec[i - 1].crystalCoordinates;
-		auto vTargPos = m_oTrackingDataVec[i].crystalCoordinates;
-
-		// When the target position is the same as the current position, we skip the iteration and sleep for the appropriate time
-		if (vTargPos == vCurrPos) // fixes the nan error
-		{
-			std::chrono::milliseconds duration(m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime);
-			std::this_thread::sleep_for(duration);
-			continue;
-		}
-
-		// We correct for the shift offset
-		cv::Point2f _startPos, _targPos;
-		vCurrPos += m_vShiftOffset;
-		vTargPos += m_vShiftOffset;
-
-		// We convert from screen coordinates to beam current.
-		this->do_beam_shift_at_coordinates(vTargPos, nullptr, _startPos, _targPos);
-
-		//CTimer timerDebug;
-		if (_Mode == MODE_ANGLE_BASED)
-		{
-			float fStartAng = _t1_angle;
-			float fMovementDuration = fabs(m_oTrackingDataVec[i].fAngle - m_oTrackingDataVec[i - 1].fAngle);
-
-			move_to_point_angle_based(_startPos, _targPos, fMovementDuration);
-			/ *while (oMover.isComplete() == false)
-			{
-				//auto t2 = m_pStage->GetCurrentTAngle(); TODO: COMPARE OLD
-				auto t2 = m_pStage->get_current_tilt_angle() - fStartAng; // NEW
-				auto point = oMover.update(t2 - _t1_angle);
-
-				m_pZeissControlManager->set_illumination_shift(point.x, point.y);
-				_t1_angle = t2;
-				if (do_check_for_emergency_exit() || m_pStage->is_stage_busy() == false)
-					break;
-
-				std::this_thread::sleep_for(25ms);
-			}* /
-		}
-		else
-		{
-
-			// We calculate the duration of the movement
-			float fMovementDuration = static_cast<float>(m_oTrackingDataVec[i].uiTime) - m_oTrackingDataVec[i - 1].uiTime;
-
-			// We check if the current time is within the range of the target time
-			if (inRange(m_oTrackingDataVec[i - 1].uiTime, m_oTrackingDataVec[i].uiTime, now, true) == false)
-			{
-				// If the current time is greater than the target time, we skip the iteration
-				if (now > m_oTrackingDataVec[i].uiTime)
-					continue;
-				// If however the current time is less than the target time, it means that we are ahead of the schedule, so we wait before moving on
-				else if (now < m_oTrackingDataVec[i - 1].uiTime)
-				{
-					PRINT("Error@inRange - timer_now < vTargetPos.timer");
-					std::chrono::milliseconds duration(m_oTrackingDataVec[i - 1].uiTime - now);
-					std::this_thread::sleep_for(duration);
-				}
-			}
-
-			//timerDebug.doStart();
-			// For each iteration, we know the starting pos, ending pos, and duration, we can smoothly move the beam to the target position
-			bool bRet = move_to_point_time_based_tem(vCurrPos, vTargPos, fMovementDuration, m_oTrackingDataVec[i - 1].uiTime, now);
-			if (bRet == false)
-			{
-				PRINT("bRet == FALSE");
-				break;
-			}
-			//timerDebug.doEnd();
-
-		}
-		//printf("Tracking Region(%d): record(%d)\ttracking(%d)\n", i, m_oTrackingDataVec[i].uiTime - m_oTrackingDataVec[i - 1].uiTime, timerDebug.returnElapsed());
-	}*/
+	
 }
 
 
 void CDataCollection::do_image_based_track_stem2(float& _t1_angle, TrackingMode _Mode)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
+	PRINTD("\t\tCDataCollection::DoImageBasedTrack()");
 	if (m_oTrackingDataVec.empty())
 		return;
 
@@ -2648,7 +2294,7 @@ void CDataCollection::do_image_based_track_stem2(float& _t1_angle, TrackingMode 
 
 void CDataCollection::do_image_based_track_stem(int& _t1_time, float& _t1_angle, TrackingMode _Mode)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoImageBasedTrack()");
+	PRINTD("\t\tCDataCollection::DoImageBasedTrack()");
 	if (m_oTrackingDataVec.empty())
 		return; 
 	
@@ -2960,8 +2606,6 @@ bool CDataCollection::move_to_point_angle_based(cv::Point2f& _start, cv::Point2f
 	return bReturn;
 }
 
-/* for testing */
-#include <future>
 
 bool bKeepLooping = true;
 
@@ -3030,211 +2674,11 @@ void arrange_frame_and_save(std::string& _fileName, i16* m_pData)
 	delete[] m_pConvertedData;
 }
 
-void run_grab_img_asyn(std::future<bool>& _collect)
-{
-	//std::map<unsigned int, bool> avoid_duplicates_angle;
-	auto zeiss = CTEMControlManager::GetInstance();
-	auto tpx = CTimepix::GetInstance();
-	auto dc = CDataCollection::GetInstance();
-	dc->_raw_img_vec.clear();
-	_collect.get(); // wait for the signal to start collecting
-	CTimer oCaptureImgTimer;
-	int iCounter = 0;
-	bKeepLooping = true;
-	static int iChipCount = tpx->m_pRelaxdModule->chipCount();
-
-	while (zeiss->is_stage_rotating())
-	{
-		dc->raw_img.fAngle = zeiss->get_stage_tilt_angle(true);
-		iCounter++;
-
-		oCaptureImgTimer.doStart();
-		
-		
-		tpx->m_pRelaxdModule->enableTimer(true, tpx->m_iExposureTimeDiff * 1000);
-		tpx->m_pRelaxdModule->openShutter();
-		while (!tpx->m_pRelaxdModule->timerExpired()) Sleep(1);
-		tpx->m_pRelaxdModule->closeShutter();
-
-	
-		if (tpx->m_pRelaxdModule->readMatrix(dc->raw_img.data, MPIX_PIXELS * iChipCount))
-			PRINT("Error @ReadingMatrix");
-
-
-	
-
-		dc->raw_img.iCounter = iCounter;
-		dc->raw_img.iTotalTime = oCaptureImgTimer.returnElapsed();
-		dc->_raw_img_vec.push_back(dc->raw_img);
-
-		
-		if (dc->m_iNumOfFramesToTake > 0 && dc->raw_img.iCounter >= dc->m_iNumOfFramesToTake)
-			break;
-		oCaptureImgTimer.doEnd();
-		//printf("Async Timer: %d ms\n", oCaptureImgTimer.returnTotalElapsed());
-		oCaptureImgTimer.doReset();
-	}
-	bKeepLooping = false;
-}
-
-
-void CDataCollection::do_collect_frames()
-{
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Start - TEST FUNCTION, ORIGINAL BELOW\n");
-	std::map<int, bool> avoid_duplicates;
-
-	if (m_pZeissControlManager->Initialised() == false || m_pTimepix->is_relaxd_module_initialized() == false)
-		return;
-	//PRINT("ResetMatrix Being Called, REMOVE if it causes problems");
-	//m_pTimepix->m_pRelaxdModule->resetMatrix();
-	//PRINT("ResetMatrix Being Called, REMOVE if it causes problems");
-
-	if (is_on_stem_mode() == false)
-		while (m_bCanStartCollecting == false)
-			std::this_thread::sleep_for(10ms);
-
-
-
-	int iCounter = 0;
-	SFrame imgFrame;
-	//_raw_collected_frames.clear();
-	m_oDiffracctionFrames.clear();
-	imgFrame.bValid = false;
-	imgFrame.fAngle = -999.f;
-	imgFrame.sFullpath = "C:/Users/TEM/Documents/Moussa_SoftwareImages/LiveStreaming/LiveStream.tiff";
-	imgFrame.sDirectory = "C:/Users/TEM/Documents/Moussa_SoftwareImages/LiveStreaming/";
-	imgFrame.sImgName = "Livestream.tiff";
-	m_oDiffracctionFrames.push_back(imgFrame);
-	CTimer oTimer;
-	m_fStartingAng = m_pStage->get_current_tilt_angle();
-	std::promise<bool> _collect; // new
-	std::future<bool> f = _collect.get_future(); //new
-	std::future<void> img_async = std::async(std::launch::async, run_grab_img_asyn, std::ref(f)); //new
-
-
-	while (m_pZeissControlManager->is_stage_rotating() == false)
-	{
-		imgFrame.bLiveStream = true;
-		imgFrame.fAngle = m_fStartingAng;
-		m_pTimepix->grab_image_from_detector(imgFrame.sFullpath);
-		//m_pTimepix->arrange_image_and_save(imgFrame.sFullpath, _raw_collected_frames.at(0));
-		m_oDiffracctionFrames.at(0) = imgFrame;
-		//	_raw_collected_frames.clear(); // if you dont want to include the "livestream image"
-	}
-
-	bKeepLooping = true;
-	_collect.set_value(bKeepLooping); // new
-	oTimer.doStart();
-	imgFrame.sDirectory = m_sDatasetPath;
-	CTimer oCollectStreamTimer;
-	oCollectStreamTimer.doStart();
-
-	//maybe we need to change the loop bellow, with a new one that reads the last data in the vector
-	//arrange it and save it so that it can be streamed.
-	int iCounterTracker = 0;
-	while (bKeepLooping)
-	{
-		while (_raw_img_vec.empty())
-			std::this_thread::sleep_for(2ms);
-		if(iCounterTracker >= _raw_img_vec.size())
-			continue;
-		auto _data_struct = _raw_img_vec.at(iCounterTracker);
-		iCounterTracker++;
-
-		if (avoid_duplicates.contains(_data_struct.iCounter) == false)
-		{
-			avoid_duplicates.insert(std::make_pair(_data_struct.iCounter, 1));
-
-			imgFrame.bValid = true;//m_pZeissControlManager->is_stem_spot_on();
-			imgFrame.bLiveStream = false;
-			imgFrame.fAngle = _data_struct.fAngle;
-			imgFrame.iTotalTime = _data_struct.iTotalTime;
-			imgFrame.iTimeOfAcquisition = oTimer.returnElapsed();
-			int iSize = m_oDiffracctionFrames.size();
-			int iMovingAverage = 20;
-			if (iSize > iMovingAverage) // moving average rotation speed
-			{
-				auto previous_imgFrame = m_oDiffracctionFrames.at(iSize - iMovingAverage);
-				imgFrame.fRotSpeed = fabs(previous_imgFrame.fAngle - imgFrame.fAngle) / ((imgFrame.iTimeOfAcquisition - previous_imgFrame.iTimeOfAcquisition) * 0.001);
-			}
-			else
-				imgFrame.fRotSpeed = fabs(m_oDiffracctionFrames.at(0).fAngle - imgFrame.fAngle) / (oTimer.returnElapsed() * 0.001);
-			imgFrame.sImgName = std::format("{:05d}.tiff", _data_struct.iCounter);
-			imgFrame.sFullpath = m_sDatasetPath + imgFrame.sImgName;
-			arrange_frame_and_save(imgFrame.sFullpath, _data_struct.data);
-
-			m_oDiffracctionFrames.push_back(imgFrame);
-		}
-	}
-	img_async.get();
-	avoid_duplicates.clear();
-
-
-	/*
-	do
-	{
-		oCollectStreamTimer.doEnd();
-		printf("The loop to grab an image took: %d ms\n", oCollectStreamTimer.returnTotalElapsed());
-		oCollectStreamTimer.doReset();
-		oCollectStreamTimer.doStart();
-
-		imgFrame.bValid = true;//m_pZeissControlManager->is_stem_spot_on();
-		imgFrame.bLiveStream = false;
-		imgFrame.fAngle = m_pStage->get_current_tilt_angle();
-		imgFrame.sImgName = std::format("{:05d}.tiff", iCounter);
-		imgFrame.sFullpath = m_sDatasetPath + imgFrame.sImgName;
-		imgFrame.fRotSpeed = fabs(m_oDiffracctionFrames.at(0).fAngle - imgFrame.fAngle) / (oTimer.returnElapsed() * 0.001);
-		m_pTimepix->grab_image_from_detector(imgFrame.sFullpath);
-
-		m_oDiffracctionFrames.push_back(imgFrame);
-		iCounter++;
-
-		if (m_iNumOfFramesToTake > 0 && iCounter >= m_iNumOfFramesToTake)
-			break;
-
-		//if (do_check_for_emergency_exit())
-		//	break;
-	} while (inRange(m_fStartingAng, m_fEndingAng, m_pStage->get_current_tilt_angle(), false) &&
-		m_pStage->is_stage_rotating() == true);
-
-		*/
-
-	oTimer.doEnd();
-	m_bCanStartCollecting = false;
-	std::this_thread::sleep_for(1s);
-	m_pZeissControlManager->stage_abort_exec();
-	std::this_thread::sleep_for(500ms);
-	float fDeltaAng = fabs(m_fStartingAng - m_pStage->get_current_tilt_angle());
-
-
-	CPostDataCollection oPostDataCollection(&m_oDiffracctionFrames, static_cast<int>(m_pZeissControlManager->get_camera_length()));
-	oPostDataCollection.m_fRotationSpeed = fDeltaAng * 1000.0f / oTimer.returnTotalElapsed();
-	oPostDataCollection.m_fIntegrationSteps = oPostDataCollection.m_fRotationSpeed * (m_pTimepix->m_iExposureTimeDiff * 0.001f);
-	m_bOnDataCollection = false;
-
-
-
-	std::this_thread::sleep_for(1s);
-	//oPostDataCollection.do_make_pets_file();
-	oPostDataCollection.do_flatfield_and_cross_correction(); // creates tiff_corrected files
-	m_oDiffracctionFrames.clear();
-
-	//float fRotationSpeed = m_pZeissControlManager->get_stage_tilt_speed();
-	//m_pZeissControlManager->set_stage_tilt_speed(70);
-	m_pStage->stage_rotate_to_angle(0.0f);
-	std::this_thread::sleep_for(1s);
-	while (m_pStage->is_stage_rotating())
-		std::this_thread::sleep_for(1s);
-	//m_pZeissControlManager->set_stage_tilt_speed(fRotationSpeed);
-
-	m_bEnable_items = true;
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Exit - TEST FUNCTION, ORIGINAL BELOW\n");
-}
 
 
 void CDataCollection::tcp_do_collect_frames()
 {
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Start - TEST FUNCTION, ORIGINAL BELOW\n");
+	PRINT("\t\tCDataCollection::DoCollectFrames() - Start \n");
 
 	static auto pTimepix = CTimepix::GetInstance();
 	CTimer oTimer;
@@ -3271,9 +2715,8 @@ void CDataCollection::tcp_do_collect_frames()
 		pTimepix->tcp_store_diffraction_images = true;
 		oTimer.doStart();
 
-
-		while (m_pZeissControlManager->is_stage_rotating() == true)
-			std::this_thread::sleep_for(500ms);
+		while (m_bOnDataCollection == true)
+			std::this_thread::sleep_for(2500ms);
 		m_fEndingAng = m_pStage->get_current_tilt_angle();
 		pTimepix->tcp_store_diffraction_images = false;
 		pTimepix->tcp_store_frames_counter = 0;
@@ -3410,179 +2853,19 @@ void CDataCollection::tcp_do_collect_frames()
 		_raw_img_vec.clear();
 	}else
 		printf("No frames were collected\n");
-
-
 	
 
-	
-
-	//float fRotationSpeed = m_pZeissControlManager->get_stage_tilt_speed();
-	//m_pZeissControlManager->set_stage_tilt_speed(70);
 	m_pStage->stage_rotate_to_angle(0.0f);
-	std::this_thread::sleep_for(1s);
-	while (m_pStage->is_stage_rotating())
-		std::this_thread::sleep_for(1s);
-	//m_pZeissControlManager->set_stage_tilt_speed(fRotationSpeed);
+	std::this_thread::sleep_for(5s);
 
 	m_bEnable_items = true;
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Exit - TEST FUNCTION, ORIGINAL BELOW\n");
+	PRINT("\t\tCDataCollection::DoCollectFrames() - Exit \n");
 }
 
-/*for testing*/
-
-
-
-
-/*
-void CDataCollection::do_collect_frames()
-{
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Start\n");
-
-	if (m_pZeissControlManager->Initialised() == false || m_pTimepix->is_relaxd_module_initialized() == false)
-		return;
-	//PRINT("ResetMatrix Being Called, REMOVE if it causes problems");
-	//m_pTimepix->m_pRelaxdModule->resetMatrix();
-	//PRINT("ResetMatrix Being Called, REMOVE if it causes problems");
-
-	int iCounter = 0;
-	SFrame imgFrame;
-	//_raw_collected_frames.clear();
-	m_oDiffracctionFrames.clear();
-	imgFrame.bValid = false;
-	imgFrame.fAngle = -999.f;
-	imgFrame.sFullpath = "C:/Users/TEM/Documents/Moussa_SoftwareImages/LiveStreaming/LiveStream.tiff";
-	imgFrame.sDirectory = "C:/Users/TEM/Documents/Moussa_SoftwareImages/LiveStreaming/";
-	imgFrame.sImgName = "Livestream.tiff";
-	m_oDiffracctionFrames.push_back(imgFrame);
-	CTimer oTimer;
-	float fStartingAng = m_pStage->get_current_tilt_angle();
-	while (m_pZeissControlManager->is_stage_rotating() == false)
-	{
-		imgFrame.bLiveStream = true;
-		imgFrame.fAngle = fStartingAng;
-		m_pTimepix->grab_image_from_detector(imgFrame.sFullpath);
-		//m_pTimepix->arrange_image_and_save(imgFrame.sFullpath, _raw_collected_frames.at(0));
-		m_oDiffracctionFrames.at(0) = imgFrame;
-	//	_raw_collected_frames.clear(); // if you dont want to include the "livestream image"
-	}
-	oTimer.doStart();
-	imgFrame.sDirectory = m_sDatasetPath;
-	CTimer oCollectStreamTimer;
-	oCollectStreamTimer.doStart();
-	do
-	{
-		oCollectStreamTimer.doEnd();
-		printf("The loop to grab an image took: %d ms\n", oCollectStreamTimer.returnTotalElapsed());
-		oCollectStreamTimer.doReset();
-		oCollectStreamTimer.doStart();
-
-		imgFrame.bValid = true;//m_pZeissControlManager->is_stem_spot_on();
-		imgFrame.bLiveStream = false;
-		imgFrame.fAngle = m_pStage->get_current_tilt_angle();
-		imgFrame.sImgName = std::format("{:05d}.tiff", iCounter);
-		imgFrame.sFullpath = m_sDatasetPath + imgFrame.sImgName;
-		imgFrame.fRotSpeed = fabs(m_oDiffracctionFrames.at(0).fAngle - imgFrame.fAngle) / (oTimer.returnElapsed() * 0.001);
-		m_pTimepix->grab_image_from_detector(imgFrame.sFullpath);
-		
-		m_oDiffracctionFrames.push_back(imgFrame);
-		iCounter++;
-
-		if (m_iNumOfFramesToTake > 0 &&  iCounter >= m_iNumOfFramesToTake)
-				break;
-
-		//if (do_check_for_emergency_exit())
-		//	break;
-	} 
-	while (inRange(m_fStartingAng, m_fEndingAng, m_pStage->get_current_tilt_angle(), false) &&
-		   m_pStage->is_stage_rotating() == true);
-
-	oTimer.doEnd();
-	float fDeltaAng = fabs(fStartingAng - m_pStage->get_current_tilt_angle());
-
-
-	CPostDataCollection oPostDataCollection(&m_oDiffracctionFrames, static_cast<int>(m_pZeissControlManager->get_camera_length()));
-	oPostDataCollection.m_fRotationSpeed = fDeltaAng * 1000.0f / oTimer.returnTotalElapsed();
-	oPostDataCollection.m_fIntegrationSteps = oPostDataCollection.m_fRotationSpeed * (m_pTimepix->m_iExposureTime * 0.001f);
-	m_bOnDataCollection = false;
-
-
-
-	oPostDataCollection.do_make_pets_file();
-	oPostDataCollection.do_flatfield_and_cross_correction(); // creates tiff_corrected files
-	m_oDiffracctionFrames.clear();
-
-	std::this_thread::sleep_for(2s);
-	float fRotationSpeed = m_pZeissControlManager->get_stage_tilt_speed();
-	m_pZeissControlManager->set_stage_tilt_speed(70);
-	m_pStage->stage_rotate_to_angle(0.0f);
-	std::this_thread::sleep_for(1s);
-	while (m_pStage->is_stage_rotating())
-		std::this_thread::sleep_for(2s);
-	m_pZeissControlManager->set_stage_tilt_speed(fRotationSpeed);
-
-	PRINT("\t\t\t\tCDataCollection::DoCollectFrames() - Exit\n");
-}
-*/
-
-void CDataCollection::do_live_stream_collected_frames()
-{
-	if (m_pZeissControlManager->Initialised() == false || m_pTimepix->is_relaxd_module_initialized() == false)
-		return;
-
-
-	bool bStopLoop = false;
-	std::string LiveStreamWindowName = "Live Streaming - Collected Frames";
-	cv::namedWindow(LiveStreamWindowName);
-	cv::moveWindow(LiveStreamWindowName, 0, -620);
-
-	cv::Mat oLiveCollectedFrame;
-	std::string sFileName = "C:/Users/TEM/Documents/Moussa_SoftwareImages/LiveStreaming/LiveStream.tiff";
-
-	while (bStopLoop == false)
-	{
-		if (m_oDiffracctionFrames.empty())
-		{
-			oLiveCollectedFrame = cv::Mat::zeros(512, 512, 2);
-		}
-		else if (m_oDiffracctionFrames.size() == 1)
-		{
-			oLiveCollectedFrame = cv::imread(sFileName, cv::IMREAD_ANYDEPTH); // remove later
-		}
-		else
-		{
-			oLiveCollectedFrame = cv::imread(m_oDiffracctionFrames.back().sFullpath, cv::IMREAD_ANYDEPTH); // remove later
-		}
-
-		if (oLiveCollectedFrame.empty() == false)
-		{
-			double max_val;
-			minMaxLoc(oLiveCollectedFrame, NULL, &max_val);
-			oLiveCollectedFrame.convertTo(oLiveCollectedFrame, CV_16UC1, 65535.0f / max_val);
-			cv::convertScaleAbs(oLiveCollectedFrame, oLiveCollectedFrame, m_pTimepix->get_contrast() / 100.0f, m_pTimepix->get_brightness());
-			cv::resize(oLiveCollectedFrame, oLiveCollectedFrame, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
-
-			if (m_pTimepix->m_bInvertColours)
-				cv::bitwise_not(oLiveCollectedFrame, oLiveCollectedFrame);
-			
-			cv::imshow(LiveStreamWindowName, oLiveCollectedFrame);
-			cv::waitKey(100);
-
-			if (do_check_for_emergency_exit())
-				break;
-		}
-		else
-			std::this_thread::sleep_for(1s);
-
-
-		if (m_bOnDataCollection == false)
-			bStopLoop = true; // break;
-	}
-	cv::destroyWindow(LiveStreamWindowName);
-}
 
 void CDataCollection::do_tilt_backlash_correction(float _fTargetAngle, bool _bPositiveDirection, float _offset /*= 5.0f*/, bool inSteps /*= false*/)
 {
-	PRINTD("\t\t\t\tCDataCollection::DoTiltBacklashCorrection()\n");
+	PRINTD("\t\tCDataCollection::DoTiltBacklashCorrection()\n");
 	
 	float fDirection = 1.0f;
 	if (_bPositiveDirection == false)
@@ -3637,6 +2920,7 @@ cv::Mat adaptiveNormalize2(const cv::Mat& image, double minIntensityThreshold = 
 	double minVal, maxVal;
 	cv::minMaxLoc(image, &minVal, &maxVal);
 
+
 	cv::Mat normalizedImage;
 	double minEffectiveVal = maxVal * 0.00f;
 
@@ -3653,36 +2937,66 @@ cv::Mat adaptiveNormalize2(const cv::Mat& image, double minIntensityThreshold = 
 }
 
 
+void CDataCollection::serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec) {
+	std::this_thread::sleep_for(50ms);
+	if (img_data_vec.empty())
+		return;
 
+	static int iCounter = 1;
+	printf("(%d) Checking for valid images -- Start\n", iCounter);
 
-void CDataCollection::serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec, unsigned int& imgIndex, unsigned int& validImgCount)
-{
-
-	for (auto& data : _raw_img_vec)
-	{
-		cv::Mat oImage = cv::Mat(512, 512, CV_16U, data.data);
-		cv::Mat crossCorrectImg = cv::Mat::zeros(cv::Size(516, 516), oImage.type());
-		CPostDataCollection::do_flatfield_correction(oImage);
-		CPostDataCollection::do_dead_pixels_correction(oImage);
-		CPostDataCollection::do_cross_correction(oImage, crossCorrectImg);
-		
-		cv::Mat preprocessImg = adaptiveNormalize2(crossCorrectImg);
-		cv::resize(preprocessImg, preprocessImg, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
-		if (is_diffraction_pattern_valid(preprocessImg, m_iSerialED_min_num_peaks, m_fSerialED_dmax, true))
-		{
-			std::string sFileName = m_sDatasetPath + std::format("{:010d}.tiff", imgIndex);
-			save_image_data_to_disk(sFileName, crossCorrectImg.data, 516);
-			validImgCount++;
-			imgIndex++;
-		}
-	}
-
+	// Use std::move to transfer the vector's data and then clear it.
+	std::vector<_img_data> raw_img_vec_copy = std::move(img_data_vec);
 	img_data_vec.clear();
-	printf("Saved Images: %d out of %d collected images\n", validImgCount, static_cast<int>(m_pTimepix->tcp_store_frames_counter));
+
+	// Launch processing in a separate thread.
+	std::thread([this, raw_img_vec_copy]() {
+		int totalframeCount = static_cast<int>(m_pTimepix->tcp_store_frames_counter);
+		std::lock_guard<std::mutex> lock(this->m_SerialEDMutex);
+		iCounter++;
+
+		// Process each image in parallel.
+		std::for_each(std::execution::par,
+			raw_img_vec_copy.begin(),
+			raw_img_vec_copy.end(),
+			[this](const _img_data& data)
+			{
+				// Construct the image using cv::Size instead of integer literals.
+				cv::Mat oImage(cv::Size(512, 512), CV_16U, (void*)(data.data));
+				cv::Mat crossCorrectImg = cv::Mat::zeros(cv::Size(516, 516), oImage.type());
+
+				CPostDataCollection::do_flatfield_correction(oImage);
+				CPostDataCollection::do_dead_pixels_correction(oImage);
+				CPostDataCollection::do_cross_correction(oImage, crossCorrectImg);
+
+				if (is_diffraction_pattern_valid(crossCorrectImg, m_iSerialED_min_num_peaks, m_fSerialED_dmax, true))
+				{
+					unsigned int currentIndex;
+					{
+						std::lock_guard<std::mutex> lock(this->m_serialEDFileIndexMutex);  // Lock only when updating
+						currentIndex = this->m_imgIndex++;
+					}
+					std::string sFileName = m_sDatasetPath + std::format("{:010d}.tiff", currentIndex);
+					save_image_data_to_disk(sFileName, crossCorrectImg.data, 516);
+					
+					{
+						std::lock_guard<std::mutex> lock(this->m_serialEDFileIndexMutex);  // Lock for updating count
+						this->m_validImgCount++;
+					}
+				}
+			});
+
+		printf("Valid Images: %d out of %d images\n", this->m_validImgCount.load(), totalframeCount);
+		printf("(%d) Checking for valid images -- End\n", iCounter);
+		}).detach();
 }
+
+
 
 bool CDataCollection::is_diffraction_pattern_valid(const cv::Mat&diffractionImg, int num_of_peaks, float d_max, bool bUseGFTT)
 {
+	std::this_thread::sleep_for(100ms);
+
 	bool bReturn = true;
 	static CImageManager* m_pImgMgr = CImageManager::GetInstance();
 	static SCameraLengthSettings oCameraLength;
@@ -3703,17 +3017,24 @@ bool CDataCollection::is_diffraction_pattern_valid(const cv::Mat&diffractionImg,
 
 	//cv::Mat contrastCorrect;
 	//cv::convertScaleAbs(diffractionImg, contrastCorrect, 0.8f * 0.5f * 1.0f / 100.0f, 1.0f);
-	bReturn = m_pImgMgr->detect_diffraction_peaks_cheetahpf8(diffractionImg, centralBeamCoords, oCameraLength.flPixelSize, d_max, detectedPeaks, m_fSerialED_i_sigma, m_fSerialED_peaksize, m_fSerialED_peakthreshold, 4);
+
+	//if(m_pCheetahPeakFinder == nullptr)
+		//m_pCheetahPeakFinder = new CCheetah_PeakFinder(diffractionImg.rows, diffractionImg.cols);
+	CCheetah_PeakFinder* pCheetahPeakFinder = new CCheetah_PeakFinder(diffractionImg.rows, diffractionImg.cols);
+	bReturn = m_pImgMgr->detect_diffraction_peaks_cheetahpf8(pCheetahPeakFinder, diffractionImg, centralBeamCoords, oCameraLength.flPixelSize, d_max, detectedPeaks, m_fSerialED_i_sigma, m_fSerialED_peaksize, m_fSerialED_peakthreshold, 4);
 	//bReturn = m_pImgMgr->detect_diffraction_peaks_cheetahpf8(diffractionImg, centralBeamCoords, oCameraLength.flPixelSize, d_max, detectedPeaks, rejectedPeaks, num_of_peaks, m_fSerialED_i_sigma, m_fSerialED_peaksize, m_fSerialED_peakdistance, 4, bUseGFTT);
+	
+	delete pCheetahPeakFinder;
 	if (bReturn == false || detectedPeaks.size() < num_of_peaks)
 		return false;
+
 	return bReturn;
 
 }
 
 void CDataCollection::do_save_data_collection_parameters()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoSaveDataCollectionParameters()\n");
+	PRINTD("\t\tCDataCollection::DoSaveDataCollectionParameters()\n");
 
 	// Parameters to save and restore later
 	m_fWorkingStageTSpeed = m_pZeissControlManager->get_stage_tilt_speed();
@@ -3729,7 +3050,7 @@ void CDataCollection::do_fast_stage_movement_parameters()
 {
 	//printf("do_fast_stage_movement_parameters no longer used.\n");
 	return;
-	PRINTD("\t\t\t\tCDataCollection::DoFastStageMovementsParameters()");
+	PRINTD("\t\tCDataCollection::DoFastStageMovementsParameters()");
 	// Parameters to edit to make life easier/faster.
 	m_pZeissControlManager->set_stage_tilt_speed(90.0f);
 	m_pZeissControlManager->set_stage_xy_speed(50.0f);
@@ -3738,7 +3059,7 @@ void CDataCollection::do_fast_stage_movement_parameters()
 
 void CDataCollection::do_restore_data_collection_parameters()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoRestoreDataCollectionParameters()\n");
+	PRINTD("\t\tCDataCollection::DoRestoreDataCollectionParameters()\n");
 	
 	m_pZeissControlManager->set_stem_magnification(m_fRecordSTEMMagnification);
 	m_pZeissControlManager->set_stage_tilt_speed(m_fWorkingStageTSpeed);
@@ -3766,7 +3087,7 @@ unsigned int CDataCollection::make_angle_key(float _fAngle)
 
 void CDataCollection::infinite_loop_for_monitoring()
 {
-	PRINTD("\t\t\t\tCDataCollection::DataCollectionMainLoop() -- Starting...");
+	PRINTD("\t\tCDataCollection::DataCollectionMainLoop() -- Starting...");
 	
 	while (m_pZeissControlManager == nullptr)
 		std::this_thread::sleep_for(500ms);
@@ -3812,13 +3133,13 @@ void CDataCollection::infinite_loop_for_monitoring()
 		m_bKeepThreadRunning = false;
 
 	
-	PRINTD("\t\t\t\tCDataCollection::DataCollectionMainLoop() -- Exiting...");
+	PRINTD("\t\tCDataCollection::DataCollectionMainLoop() -- Exiting...");
 }
 
 
 void CDataCollection::do_move_stage_to_mouse_coordinates()
 {
-	PRINTD("\t\t\t\tCDataCollection::DoMoveStageToMouseCoords()");
+	PRINTD("\t\tCDataCollection::DoMoveStageToMouseCoords()");
 	
 	POINT mouseCoords;
 	GetCursorPos(&mouseCoords);
@@ -3866,12 +3187,11 @@ void CDataCollection::onMouse_2DMap(int event, int x, int y, int, void* userdata
 		for (auto it = gridRegions.begin(); it != gridRegions.end(); ++it) {
 			if (it->gridRegion.contains(cv::Point(x, y))) {
 				gridRegions.erase(it);
-				// Update the display immediately after deletion
+
+				// Update the display
 				cv::Mat tempCanvas = canvas->clone();
 				for (const auto& region : gridRegions) {
 						cv::rectangle(tempCanvas, region.gridRegion, region.isRegionScanned ? COLOR_GRIDREGION_SCANNED : COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
-					
-
 				}
 				// Draw the current stage position
 				cv::circle(tempCanvas, *stagePosition, 5, cv::Scalar(255, 0, 0), -1, cv::LINE_AA); // Blue circle for stage position
@@ -3891,19 +3211,17 @@ void CDataCollection::onMouse_2DMap(int event, int x, int y, int, void* userdata
 			selection->gridRegion.width = x - selection->gridRegion.x;
 			selection->gridRegion.height = y - selection->gridRegion.y;
 
-			// Draw the current selection on a temporary canvas
 			cv::Mat tempCanvas = canvas->clone();
 			for (const auto& region : gridRegions) {
 				cv::rectangle(tempCanvas, region.gridRegion, region.isRegionScanned ? COLOR_GRIDREGION_SCANNED : COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
 			}
 			cv::rectangle(tempCanvas, selection->gridRegion, COLOR_GRIDREGION_UNSCANNED, 2, cv::LINE_AA);
-			// Draw the current stage position
+			
 			cv::circle(tempCanvas, *stagePosition, 5, cv::Scalar(255, 0, 0), -1, cv::LINE_AA); // Blue circle for stage position
 			cv::imshow("TEM Stage Map", tempCanvas);
 		}
 	}
 	else if (*isDragging == true && event == cv::EVENT_LBUTTONUP) {
-		// Finish drawing the selection rectangle
 		*isDragging = false;
 
 		if (selection->gridRegion.width != 0 && selection->gridRegion.height != 0) {
@@ -3936,23 +3254,22 @@ void CDataCollection::onMouse_2DMap(int event, int x, int y, int, void* userdata
 void CDataCollection::display_2d_map() {
 	std::string windowName = "TEM Stage Map";
 
-	// Static part: Create an empty image to represent the TEM stage
-	int canvasSize = _CANVAS_SIZE_; // Size of the canvas in pixels
+	int canvasSize = _CANVAS_SIZE_; 
 
 	cv::Mat canvas = cv::Mat::zeros(canvasSize, canvasSize, CV_8UC3);
 	canvas.setTo(cv::Scalar(200, 200, 200)); // gray background
 
 	// Calculate the scaling factor to fit the stage movement limit within the canvas
-	float scalingFactor = static_cast<float>(canvasSize) / _GRID_MAX_LENGTH; // 2000um is the stage movement limit
+	float scalingFactor = static_cast<float>(canvasSize) / _GRID_MAX_LENGTH;
 
-	// Define the center and radius for the circle representing the stage movement limit
+	// Center and radius of the circle defining the accessible area of the grid, similar to what we see within the TEM software.
 	cv::Point center(canvasSize / 2, canvasSize / 2);
-	int radius = static_cast<int>(_GRID_MAX_LENGTH * 0.5f * scalingFactor);  // Scale radius to fit within the new canvas size
+	int radius = static_cast<int>(_GRID_MAX_LENGTH * 0.5f * scalingFactor);
 
-	// Draw the circle representing the stage movement limit
+	// Draw the circle
 	cv::circle(canvas, center, radius, cv::Scalar(0, 0, 200), 2, cv::LINE_AA); // Red circle
 
-	// Draw grid lines every 100um, scaled to fit the canvas
+	// Grid lines
 	int gridSpacing = static_cast<int>(100 * scalingFactor);
 	for (int i = gridSpacing; i < canvasSize; i += gridSpacing) {
 		// Vertical lines
@@ -3962,21 +3279,20 @@ void CDataCollection::display_2d_map() {
 		cv::line(canvas, cv::Point(0, i), cv::Point(canvasSize, i), cv::Scalar(50, 50, 50), thickness, cv::LINE_AA);
 	}
 
-	cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE); // Use WINDOW_AUTOSIZE to maintain size without resizing
+	cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
 	cv::moveWindow(windowName, 0, -1024);
 #ifdef _DEBUGGING_
 	cv::moveWindow(windowName, 0, 0);
 #endif
 
-	// Variables for interaction
 	GridRegions selection;
 	bool isDragging = false;
 
 	auto params = std::make_tuple(&canvas, &selection, &scalingFactor, &isDragging, this);
 	cv::setMouseCallback(windowName, onMouse_2DMap, &params);
 
-	// Dynamic part: Wait for user input to toggle the map display or exit
 	m_bIs2DMapVisible = true;
+
 	// Draw the current stage position
 	while (m_bIs2DMapVisible) {
 		cv::Mat tempCanvas = canvas.clone();
@@ -4007,22 +3323,27 @@ void CDataCollection::display_2d_map() {
 void CDataCollection::do_serial_ed_regions_scan() {
 	// Iterate over each selected region and perform zigzag scanning
 
+	m_imgIndex = m_validImgCount = 0;
+
 	float scalingFactor = static_cast<float>(_CANVAS_SIZE_) / _GRID_MAX_LENGTH; // 2000um is the stage movement limit
-	unsigned int validImgCount = 0;
+	//unsigned int validImgCount = 0;
+	//unsigned int imgIndex = 0;
+
+
 	m_pTimepix->tcp_store_frames_counter = 0;
 
 
-	unsigned int imgIndex = 0;
 	for (const auto& entry : std::filesystem::directory_iterator(m_sDatasetPath))
 	{
 		if (entry.path().extension() == ".tiff")
-			imgIndex++;
+			m_imgIndex++;
 	}
 
 	int iRegionID = -1;
 	
 	bool bBreakScan = false;
-	for (auto& region : gridRegions) {
+	for (int i = 0; i < gridRegions.size(); i++) {
+		auto& region = gridRegions[i];
 		iRegionID++;
 
 		if (region.isRegionScanned)
@@ -4071,16 +3392,13 @@ void CDataCollection::do_serial_ed_regions_scan() {
 
 						if(bBreakScan)
 							break;
-					}
 
+					}
 
 					if (m_pTimepix->tcp_store_diffraction_images == false) // If we're here, it's because we've stored more than the fixed number of images in the vector.
 					{
-
-						serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
-						_raw_img_vec.clear();
+						serial_ed_store_valid_images_to_disk(_raw_img_vec);
 						m_pTimepix->tcp_store_diffraction_images = true;
-
 					}
 
 					fCurrentStageX = m_pZeissDataCollection->m_pStage->get_stage_x();
@@ -4088,8 +3406,7 @@ void CDataCollection::do_serial_ed_regions_scan() {
 						break;
 				}
 				m_pTimepix->tcp_store_diffraction_images = false;
-				serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
-				_raw_img_vec.clear();
+				serial_ed_store_valid_images_to_disk(_raw_img_vec);
 
 				if (bBreakScan)
 					break;
@@ -4113,8 +3430,8 @@ void CDataCollection::do_serial_ed_regions_scan() {
 					if (m_pTimepix->tcp_store_diffraction_images == false) // If we're here, it's because we've stored more than the fixed number of images in the vector.
 					{
 
-						serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
-						_raw_img_vec.clear();
+						serial_ed_store_valid_images_to_disk(_raw_img_vec);
+						//_raw_img_vec.clear();
 						m_pTimepix->tcp_store_diffraction_images = true;
 
 					}
@@ -4124,8 +3441,9 @@ void CDataCollection::do_serial_ed_regions_scan() {
 						break;
 				}
 				m_pTimepix->tcp_store_diffraction_images = false;
-				serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
-				
+				serial_ed_store_valid_images_to_disk(_raw_img_vec);
+				//_raw_img_vec.clear();
+
 				if (bBreakScan)
 					break;
 			}
@@ -4149,7 +3467,10 @@ void CDataCollection::do_serial_ed_regions_scan() {
 		if (m_bSerialEDScanRegions == false || bBreakScan)
 		{
 			m_pTimepix->tcp_store_diffraction_images = false;
-			serial_ed_store_valid_images_to_disk(_raw_img_vec, imgIndex, validImgCount);
+			std::this_thread::sleep_for(1s);
+			if (_raw_img_vec.empty() == false)
+				serial_ed_store_valid_images_to_disk(_raw_img_vec);
+			//_raw_img_vec.clear();
 			break;
 		}
 
@@ -4158,7 +3479,6 @@ void CDataCollection::do_serial_ed_regions_scan() {
 		CWriteFile::GetInstance()->write_params_file(); // update the params file
 
 	}
-
 
 	m_pZeissControlManager->stage_abort_exec();
 	m_pZeissControlManager->do_blank_beam(true);
@@ -4193,7 +3513,7 @@ bool CDataCollection::is_on_stem_mode()
 
 std::vector<my_params> CDataCollection::save_parameters()
 {
-	PRINTD("\t\t\t\tCDataCollection::save_parameters\n");
+	PRINTD("\t\tCDataCollection::save_parameters\n");
 
 	std::vector<my_params> params_to_save;
 	
@@ -4217,6 +3537,11 @@ std::vector<my_params> CDataCollection::save_parameters()
 	params_to_save.emplace_back("EucentricHeightDeltaZ", m_fEucentricHeightDeltaZ);
 	params_to_save.emplace_back("ImageBasedTrackingSteps", m_fRecordImgSteps);
 	params_to_save.emplace_back("ImageBasedTrackingStepsVariable", m_fRecordImgStepsVariable);
+
+	// Exposure time info
+	params_to_save.emplace_back("ExposureTimeDiff", CTimepix::GetInstance()->m_iExposureTimeDiff);
+	params_to_save.emplace_back("ExposureTimeImg", CTimepix::GetInstance()->m_iExposureTimeImg);
+
 
 	// Info on the SerialED Section:
 	params_to_save.emplace_back("SerialED_YSteps", m_fSerialED_ysteps);
@@ -4377,16 +3702,48 @@ std::vector<my_params> CDataCollection::save_parameters()
 		params_to_save.emplace_back(std::to_string(i) + "_" + "GRID_STAGE_Z", gridRegions[i].stage_z);
 	}
 
+	return params_to_save;
+}
 
+std::vector<my_params> CDataCollection::save_serialed_data()
+{
+	PRINTD("\t\tCDataCollection::save_serialed_data\n");
+	std::vector<my_params> params_to_save;
 
+	bool bisSTEMMode = is_on_stem_mode();
 
+	params_to_save.emplace_back("OPERATOR", m_sOperatorName);
+	params_to_save.emplace_back("DATE", m_sCollectionDate);
+	params_to_save.emplace_back("CRYSTAL_NAME", m_sCrystalName);
+	params_to_save.emplace_back("OPERATION_MODE", bisSTEMMode ? "STEM" : "TEM");
+
+	params_to_save.emplace_back("EMISSION_CURRENT", m_pZeissControlManager->get_actual_emission_current());
+	if (bisSTEMMode) {
+		params_to_save.emplace_back("SPOT_SIZE", m_pZeissControlManager->get_spot_size());
+	}
+	else
+	{
+		params_to_save.emplace_back("Ill_Angle", m_pZeissControlManager->get_illumination_angle());
+	}
+
+	params_to_save.emplace_back("CAMERA_LENGTH", m_pZeissControlManager->get_camera_length());
+	params_to_save.emplace_back("STAGE_XY_SPEED", m_pZeissControlManager->get_stage_xy_speed());
+	params_to_save.emplace_back("ROTATION_SPEED", m_pZeissControlManager->get_stage_tilt_speed());
+	params_to_save.emplace_back("EXPOSURE_TIME", CTimepix::GetInstance()->m_iExposureTimeDiff);
+
+	// Peak Detection Settings
+	params_to_save.emplace_back("STAGE_Y_STEP", m_fSerialED_ysteps);
+	params_to_save.emplace_back("D_MAX", m_fSerialED_dmax);
+	params_to_save.emplace_back("THRESHOLD", m_fSerialED_peakthreshold);
+	params_to_save.emplace_back("PEAK_SIZE", m_fSerialED_peaksize);
+	params_to_save.emplace_back("I_SIGMA", m_fSerialED_i_sigma);
 
 	return params_to_save;
 }
 
 std::vector<my_params> CDataCollection::save_tracking_data()
 {
-	PRINTD("\t\t\t\tCDataCollection::save_tracking_data\n");
+	PRINTD("\t\tCDataCollection::save_tracking_data\n");
 
 	std::vector<my_params> params_to_save;
 	int iSize = m_oImageBasedVec.size();
@@ -4423,7 +3780,7 @@ std::vector<my_params> CDataCollection::save_tracking_data()
 
 void CDataCollection::restore_parameters()
 {
-	PRINTD("\t\t\t\tCDataCollection::restore_parameters\n");
+	PRINTD("\t\tCDataCollection::restore_parameters\n");
 
 
 	auto pFileWriter = CWriteFile::GetInstance();
@@ -4448,6 +3805,10 @@ void CDataCollection::restore_parameters()
 	pFileWriter->restore_param("EucentricHeightDeltaZ", m_fEucentricHeightDeltaZ);
 	pFileWriter->restore_param("ImageBasedTrackingSteps", m_fRecordImgSteps);
 	pFileWriter->restore_param("ImageBasedTrackingStepsVariable", m_fRecordImgStepsVariable);
+
+	// Info regarding the detector
+	pFileWriter->restore_param("ExposureTimeDiff", CTimepix::GetInstance()->m_iExposureTimeDiff);
+	pFileWriter->restore_param("ExposureTimeImg", CTimepix::GetInstance()->m_iExposureTimeImg);
 
 	// Info on the SerialED Section:
 	pFileWriter->restore_param("SerialED_YSteps", m_fSerialED_ysteps);
@@ -4527,7 +3888,7 @@ void CDataCollection::restore_parameters()
 
 void CDataCollection::restore_tracking_data()
 {
-	PRINTD("\t\t\t\tCDataCollection::restore_tracking_data\n");
+	PRINTD("\t\tCDataCollection::restore_tracking_data\n");
 	
 	std::map<std::string, std::string> configMap;
 	auto pFileWriter = CWriteFile::GetInstance();
@@ -4570,7 +3931,7 @@ void CDataCollection::restore_tracking_data()
 
 CDataCollection* CDataCollection::GetInstance()
 {
-	PRINTD("\t\t\t\tCDataCollection::GetInstance\n");
+	PRINTD("\t\tCDataCollection::GetInstance\n");
 
 	if (m_pZeissDataCollection == nullptr)
 		m_pZeissDataCollection = new CDataCollection();
@@ -4707,7 +4068,7 @@ void TEMModeParameters::RestoreCurrentParameters(TEM_SETTING id)
 			pDC->do_set_current_illumination_shift_coordinates(illumination_shift_vec.x, illumination_shift_vec.y);
 			zeissControl->set_illumination_shift(illumination_shift_vec.x, illumination_shift_vec.y);
 
-			zeissControl->set_illumination_tilt(illumination_tilt_vec.x, illumination_tilt_vec.y);
+			//zeissControl->set_illumination_tilt(illumination_tilt_vec.x, illumination_tilt_vec.y);
 
 			// MIS number
 			zeissControl->set_mis_num(aperture_selection_number);
@@ -4743,14 +4104,6 @@ void TEMModeParameters::RestoreCurrentParameters(TEM_SETTING id)
 
 				}
 			}
-
-			/*if(pDC->m_bCorrectCalibration)
-			{
-				std::this_thread::sleep_for(75ms);
-				zeissControl->do_calibrate_focus();
-				std::this_thread::sleep_for(75ms);
-				zeissControl->do_calibrate_magnification();
-			}*/
 
 			// Focus
 			zeissControl->set_focus(focus);

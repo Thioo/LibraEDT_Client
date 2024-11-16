@@ -86,4 +86,6 @@ public:
 	afx_msg void OnBnClickedDcQcSpeedxy50();
 	afx_msg void OnBnClickedDcQcSpeedxy20();
 	afx_msg void OnBnClickedDcQcSpeedxy5();
+	afx_msg void OnBnClickedButton2();
+	afx_msg void OnBnClickedDcCalibDistortions();
 };

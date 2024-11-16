@@ -126,7 +126,6 @@ public:
 	~CTimepix();
 	static CTimepix* GetInstance();
 
-	void prepare_for_live_stream();
 	void grab_image_from_detector(std::string& _fileName, int _exposureTime = -1);
 	bool is_image_rotated_and_flipped() { return m_bRotateImg; }
 private:
@@ -134,8 +133,6 @@ private:
 	void prepare_for_NAT();
 	void initialize_Relaxd_module();
 	void save_image(std::string&_fileName, const void*_data, uint32_t iSize = 512, uint16_t type = 16);
-	void grab_image_live_stream();
-	void stream_image_live_stream();
 
 	cv::Mat correct_raw_image(cv::Mat& img_to_correct);
 };

@@ -227,9 +227,6 @@
     <ClCompile Include="CPostDataCollection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Windows_Linux_Client_Server.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Cheetah_PeakFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -251,7 +248,5 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Notes.txt" />
-    <Text Include="Notes_2.txt" />
-    <Text Include="Notes_3.txt" />
   </ItemGroup>
 </Project>

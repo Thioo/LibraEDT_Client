@@ -1,6 +1,7 @@
 #include "pch.h"
 #define IMG_RESIZE_FACTOR 1
 CImageManager* CImageManager::m_pImgMgr = nullptr;
+std::vector<cv::RotatedRect> CImageManager::m_ellipses;
 
 CImageManager::CImageManager()
 {
@@ -8,6 +9,9 @@ CImageManager::CImageManager()
     if (bDoOnce == false)
     {
         bDoOnce = true;
+		
+
+		m_ellipses.reserve(100);
     }
 }
 
@@ -186,7 +190,7 @@ void CImageManager::display_image(std::vector<ImagesInfo>* _vImages)
         }
         else // if (ImagesInfo::_purpose == TEM_BEAM_CALIB || ImagesInfo::_purpose == TEM_TRACKING)
         {
-			cv::resize(myImg, myImg, cv::Size(), IMG_RESIZE_FACTOR__, IMG_RESIZE_FACTOR__);
+			cv::resize(myImg, myImg, cv::Size(), IMG_RESIZE_FACTOR_, IMG_RESIZE_FACTOR_);
 			
 			// Try to find the beam automatically
 			if(ImagesInfo::_purpose == TEM_BEAM_CALIB)
@@ -446,7 +450,7 @@ bool CImageManager::find_central_beam_position(const cv::Mat& imgInput, cv::Poin
 
 		cv::Point2f imageCenter(imgInput.cols / 2.0f, imgInput.rows / 2.0f);
 
-		float searchRadius = 50.0f; // Adjust based on expected beam size
+		float searchRadius = 500.0f; // Adjust based on expected beam size
 		cv::Mat mask = cv::Mat::zeros(normalizedImage.size(), CV_8UC1);
 		cv::circle(mask, imageCenter, static_cast<int>(searchRadius), 255, -1, cv::LINE_AA);
 
@@ -471,16 +475,18 @@ bool CImageManager::find_central_beam_position(const cv::Mat& imgInput, cv::Poin
 
 		float cx = static_cast<float>(moments.m10 / moments.m00) + xStart;
 		float cy = static_cast<float>(moments.m01 / moments.m00) + yStart;
+
 		beamLocation = cv::Point2f(cx, cy);
 
-		float maxAllowedDistance = 75.0f; // Maximum distance from image center
+		CDataCollection::GetInstance()->m_fCentralBeamTolerance = 40.0f;
 		if(CDataCollection::GetInstance()->m_bSerialEDScanRegions)
-			maxAllowedDistance = 20.0f;
+			CDataCollection::GetInstance()->m_fCentralBeamTolerance = 20.0f;
 
 		float actualDistance = cv::norm(beamLocation - imageCenter);
-		if (actualDistance > maxAllowedDistance) {
+		if (actualDistance > CDataCollection::GetInstance()->m_fCentralBeamTolerance ) {
 			//std::cerr << "Error: Beam location is too far from image center (" << actualDistance << " pixels)." << std::endl;
-			return false; // alternatively we can use the center of the image instead...
+			
+			return true;
 		}
 
 		return true;
@@ -542,12 +548,10 @@ bool CImageManager::detect_diffraction_peaks_old(const cv::Mat& imgInput, std::v
 		cv::Mat blurred;
 		cv::GaussianBlur(gray, blurred, cv::Size(7, 7), 1.0);
 
-		// Ensure the blurred image is in CV_8U format
 		if (blurred.type() != CV_8U) {
 			blurred.convertTo(blurred, CV_8U);
 		}
 
-		// Threshold to find the central beam using Otsu's method (full strength)
 		cv::Mat centralBinary;
 		double centralThresholdValue = cv::threshold(blurred, centralBinary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
@@ -672,7 +676,6 @@ cv::Mat CImageManager::preprocessImageForPeakDetection(const cv::Mat& grayImg, d
 			return cv::Mat();
 		}
 
-		// Step 1: Convert to 8-bit unsigned integer if not already
 		cv::Mat preprocessedImg;
 		if (grayImg.type() != CV_8U) {
 			grayImg.convertTo(preprocessedImg, CV_8U);
@@ -681,35 +684,27 @@ cv::Mat CImageManager::preprocessImageForPeakDetection(const cv::Mat& grayImg, d
 			preprocessedImg = grayImg.clone();
 		}
 
-		// Step 2: Normalize the image to range [0, 255]
 		cv::normalize(preprocessedImg, preprocessedImg, 0, 255, cv::NORM_MINMAX);
 		preprocessedImg.convertTo(preprocessedImg, CV_8U);
 
-		// Step 3: Apply Binning (Downsampling and Upsampling)
 		if (binFactor > 1) {
 			cv::Mat binnedImg;
-			// Calculate new size for downsampling
 			cv::Size newSize(preprocessedImg.cols / binFactor, preprocessedImg.rows / binFactor);
 
-			// Ensure new size is at least 1x1
 			newSize.width = std::max(newSize.width, 1);
 			newSize.height = std::max(newSize.height, 1);
 
-			// Downsample using INTER_AREA for binning (averaging)
 			cv::resize(preprocessedImg, binnedImg, newSize, 0, 0, cv::INTER_AREA);
-
-			// Upsample back to original size using INTER_NEAREST to preserve averaged values
 			cv::resize(binnedImg, preprocessedImg, preprocessedImg.size(), 0, 0, cv::INTER_NEAREST);
 		}
 
-		// Step 4: Apply Median Blur
+		// Apply Median Blur
 		// Determine the kernel size based on reflection size
-		// Ensure kernel size is odd and at least 3
 		int kernelSize = static_cast<int>(std::round(reflectionSize));
-		if (kernelSize % 2 == 0) {
+		if (kernelSize % 2 == 0) { // kernel has to be odd
 			kernelSize += 1;
 		}
-		kernelSize = std::max(kernelSize, 3); // Minimum kernel size of 3
+		kernelSize = std::max(kernelSize, 3); 
 
 		cv::Mat blurredImg;
 		cv::medianBlur(preprocessedImg, blurredImg, kernelSize);
@@ -736,18 +731,18 @@ cv::Mat CImageManager::preprocessImageForPeakDetection(const cv::Mat& grayImg, d
 
 cv::Vec4d fitLeastSquaresPlane(const std::vector<cv::Point>& bgPoints, const cv::Mat& img) {
 	int n = static_cast<int>(bgPoints.size());
-	cv::Mat A(n, 3, CV_64F);  // Coefficient matrix
-	cv::Mat B(n, 1, CV_64F);  // Intensities
+	cv::Mat A(n, 3, CV_64F);  
+	cv::Mat B(n, 1, CV_64F);  
 
 	for (int i = 0; i < n; ++i) {
-		A.at<double>(i, 0) = bgPoints[i].x;  // x-coordinates
-		A.at<double>(i, 1) = bgPoints[i].y;  // y-coordinates
-		A.at<double>(i, 2) = 1.0;            // Constant term
-		B.at<double>(i, 0) = img.at<uchar>(bgPoints[i]);  // Intensity values
+		A.at<double>(i, 0) = bgPoints[i].x;  
+		A.at<double>(i, 1) = bgPoints[i].y;  
+		A.at<double>(i, 2) = 1.0;           
+		B.at<double>(i, 0) = img.at<uchar>(bgPoints[i]);  
 	}
 
 	cv::Mat coeffs;
-	cv::solve(A, B, coeffs, cv::DECOMP_SVD);  // Least squares fitting
+	cv::solve(A, B, coeffs, cv::DECOMP_SVD);  // LSQ fitting
 
 	return cv::Vec4d(coeffs.at<double>(0), coeffs.at<double>(1), coeffs.at<double>(2), 0);
 }
@@ -766,11 +761,9 @@ cv::Point2f refinePeakPositionCentroid(const cv::Mat& roi) {
 	cv::Moments m = cv::moments(roi, true);  // Calculate moments
 
 	if (m.m00 != 0) {
-		// Return centroid position (x = m10/m00, y = m01/m00)
 		return cv::Point2f(static_cast<float>(m.m10 / m.m00), static_cast<float>(m.m01 / m.m00));
 	}
 	else {
-		// In case of zero division, fall back to center of ROI
 		return cv::Point2f(roi.cols / 2.0, roi.rows / 2.0);
 	}
 }
@@ -806,98 +799,6 @@ bool CImageManager::detect_diffraction_peaks(const cv::Mat& imgInput, const cv::
 		else
 			initialPeaks = bhFindLocalMaximum(maskedImg, mask, 2, maxCorners, qualityLevel_contourSize, minDistance);
 
-		/*for (auto initialPeak : initialPeaks)
-		{
-			double distanceFromCenter = cv::norm(initialPeak - cv::Point(centralBeam));
-
-			// Check if the peak is outside the resolution limit
-			if (distanceFromCenter <= resolutionRadiusPixels)
-				continue;
-
-
-			// Now refine the peak position using the raw image
-			// Define a small ROI around the initial peak position in the raw image
-			int refinementWindowSize = static_cast<int>(qualityLevel_contourSize * 5);
-			int halfWindowSize = refinementWindowSize / 2;
-
-			cv::Rect refinementROI(initialPeak.x - halfWindowSize, initialPeak.y - halfWindowSize, refinementWindowSize, refinementWindowSize);
-			refinementROI &= cv::Rect(0, 0, grayImg.cols, grayImg.rows); // Ensure ROI is within image bounds
-
-			cv::Mat roi = grayImg(refinementROI);
-
-			// Find the local maximum within the ROI in the raw image
-			double minVal, maxVal;
-			cv::Point minLoc, maxLoc;
-			cv::minMaxLoc(roi, &minVal, &maxVal, &minLoc, &maxLoc);
-
-			// Adjust maxLoc to image coordinates
-			cv::Point refinedPeak = maxLoc + cv::Point(refinementROI.x, refinementROI.y);
-
-			// Optionally, calculate the centroid around the refined peak
-			cv::Point2f centroid = refinePeakPositionCentroid(roi);  // Centroid method
-			centroid += cv::Point2f(refinementROI.x, refinementROI.y);  // Adjust to full image coordinates
-
-			// Now perform I/sigma calculation as before, using the centroid position
-			// Define ROI size based on contour_size
-			int roiRadius = static_cast<int>(qualityLevel_contourSize / 2.0);
-			roiRadius = std::max(roiRadius, 1);  // Ensure at least a 1-pixel radius
-
-			// Define the ROI for the peak
-			cv::Rect roiRect(static_cast<int>(centroid.x - roiRadius), static_cast<int>(centroid.y - roiRadius),
-				roiRadius * 2 + 1, roiRadius * 2 + 1);
-			roiRect &= cv::Rect(0, 0, grayImg.cols, grayImg.rows);  // Ensure ROI is within image bounds
-
-			// Extract the ROI from the raw image
-			cv::Mat peakRoi = grayImg(roiRect);
-
-			// Sum the intensity within the ROI for peak intensity
-			double peakIntensity = cv::mean(peakRoi)[0];
-
-			// Define a background annulus around the ROI
-			int backgroundInnerRadius = roiRadius + 1;
-			int backgroundOuterRadius = backgroundInnerRadius + static_cast<int>(minDistance / 2.0);
-
-			// Create a mask for the background annulus
-			cv::Mat backgroundMask = cv::Mat::zeros(grayImg.size(), CV_8U);
-			cv::circle(backgroundMask, refinedPeak, backgroundOuterRadius, cv::Scalar(255), -1);
-			cv::circle(backgroundMask, refinedPeak, backgroundInnerRadius, cv::Scalar(0), -1);
-
-			// Exclude areas outside the image
-			backgroundMask &= mask;
-
-			// Avoid overlapping with other peaks by excluding regions around them
-			for (const auto& otherMax : initialPeaks)
-			{
-				if (otherMax == initialPeak)
-					continue;
-				cv::circle(backgroundMask, otherMax, roiRadius, cv::Scalar(0), -1);
-			}
-
-			// Calculate the background statistics
-			cv::Scalar backgroundMean, backgroundStdDev;
-			cv::meanStdDev(grayImg, backgroundMean, backgroundStdDev, backgroundMask);
-
-			double sigma = backgroundStdDev[0];
-
-			// Check if sigma is valid
-			if (sigma <= 0)
-			{
-				detectedPeaks.push_back(centroid);
-				continue;
-			}
-
-			// Calculate I/sigma
-			double I_sigma = peakIntensity / sigma;
-
-			// Decide whether to accept or reject the peak
-			if (I_sigma > i_sigma)
-				detectedPeaks.push_back(centroid);
-			else
-				rejectedPeaks.push_back(centroid);
-		}
-
-		return true;*/
-
 		for (auto initialPeak : initialPeaks)
 		{
 			double distanceFromCenter = cv::norm(initialPeak - cv::Point(centralBeam));
@@ -911,7 +812,7 @@ bool CImageManager::detect_diffraction_peaks(const cv::Mat& imgInput, const cv::
 			int halfWindowSize = refinementWindowSize / 2;
 
 			cv::Rect refinementROI(initialPeak.x - halfWindowSize, initialPeak.y - halfWindowSize, refinementWindowSize, refinementWindowSize);
-			refinementROI &= cv::Rect(0, 0, grayImg.cols, grayImg.rows); // Ensure ROI is within image bounds
+			refinementROI &= cv::Rect(0, 0, grayImg.cols, grayImg.rows); 
 
 			cv::Mat roi = preprocessedImg(refinementROI);
 
@@ -919,11 +820,11 @@ bool CImageManager::detect_diffraction_peaks(const cv::Mat& imgInput, const cv::
 			cv::Point2f refinedPeak;
 			if (true) {
 				refinedPeak = refinePeakPositionCentroid(roi);  // Centroid method
-				refinedPeak += cv::Point2f(refinementROI.x, refinementROI.y);  // Adjust to full image coordinates
+				refinedPeak += cv::Point2f(refinementROI.x, refinementROI.y); 
 			}
 			else {
 				cv::Point maxLoc = refinePeakPositionMaxIntensity(roi);  // Max intensity method
-				refinedPeak = cv::Point2f(maxLoc.x + refinementROI.x, maxLoc.y + refinementROI.y);  // Adjust to full image coordinates
+				refinedPeak = cv::Point2f(maxLoc.x + refinementROI.x, maxLoc.y + refinementROI.y);  
 			}
 
 			// Define a circular region around the refined peak for intensity calculation
@@ -1000,7 +901,7 @@ bool CImageManager::detect_diffraction_peaks(const cv::Mat& imgInput, const cv::
 		return false;
 	}
 }
-bool CImageManager::detect_diffraction_peaks_cheetahpf8(const cv::Mat&imgInput, const cv::Point2f&centralBeam, double pixelSize, double d_max, std::vector<cv::Point2f>&detectedPeaks, float i_sigma, double peaksize, double threshold, unsigned int binFactor)
+bool CImageManager::detect_diffraction_peaks_cheetahpf8(CCheetah_PeakFinder* _cheetah_pf, const cv::Mat&imgInput, const cv::Point2f&centralBeam, double pixelSize, double d_max, std::vector<cv::Point2f>&detectedPeaks, float i_sigma, double peaksize, double threshold, unsigned int binFactor)
 {
 	// convert the image to a float image
 	cv::Mat imgFloat;
@@ -1008,8 +909,15 @@ bool CImageManager::detect_diffraction_peaks_cheetahpf8(const cv::Mat&imgInput, 
 
 	float resizeFac = 1.0f / binFactor;
 	cv::resize(imgFloat, imgFloat, cv::Size(), resizeFac, resizeFac);
-	if (m_pCheetahPeakFinder == nullptr)
-		m_pCheetahPeakFinder = CCheetah_PeakFinder::GetInstance(imgFloat.rows, imgFloat.cols);
+	//if (m_pCheetahPeakFinder == nullptr)
+	//	m_pCheetahPeakFinder = CCheetah_PeakFinder::GetInstance(imgFloat.rows, imgFloat.cols);
+
+	if (_cheetah_pf == nullptr)
+	{
+		std::cerr << "Error: Peak Finder is not initialized." << std::endl;
+		return false;
+	}
+
 	float* data = reinterpret_cast<float*>(imgFloat.data);
 
 	// Mask around the central beam up to the resolution limit
@@ -1021,31 +929,31 @@ bool CImageManager::detect_diffraction_peaks_cheetahpf8(const cv::Mat&imgInput, 
 	cv::Mat maskMat = maskMatInner & maskMatOuter;
 	char* mask = reinterpret_cast<char*>(maskMat.data);
 
-	// pix_r
 	long pix_nx = imgFloat.cols; // Width
 	long pix_ny = imgFloat.rows; // Height
-	long pix_nn = pix_nx * pix_ny;  // Total number of pixels
+	long pix_nn = pix_nx * pix_ny; 
+	//float* pix_r = new float[pix_nn]; 
 
 
-	// Define the center of the image (central beam's coords)400
+	// Define the center of the image (central beam's coords)
 	float cx = centralBeam.x / binFactor;
 	float cy = centralBeam.y / binFactor;
 
-	// Compute the radius for each pixel
 	for (long y = 0; y < pix_ny; y++) {
 		for (long x = 0; x < pix_nx; x++) {
 			long idx = y * pix_nx + x;
 			float dx = x - cx;
 			float dy = y - cy;
-			m_pCheetahPeakFinder->m_pix_r[idx] = sqrt(dx * dx + dy * dy);
+			_cheetah_pf->m_pix_r[idx] = sqrt(dx * dx + dy * dy);
+			//pix_r[idx] = sqrt(dx * dx + dy * dy);
 		}
 	}
 	
 	
-	long asic_nx = pix_nx; // ASIC width
-	long asic_ny = pix_ny; // ASIC height
-	long nasics_x = 1;     // Number of ASICs in x-direction
-	long nasics_y = 1;     // Number of ASICs in y-direction
+	long asic_nx = pix_nx; 
+	long asic_ny = pix_ny; 
+	long nasics_x = 1;    
+	long nasics_y = 1;     
 
 	float ADCthresh = threshold;           // ADC threshold to ignore low-intensity pixels
 	float hitfinderMinSNR = i_sigma;     // Minimum signal-to-noise ratio for a peak
@@ -1056,80 +964,258 @@ bool CImageManager::detect_diffraction_peaks_cheetahpf8(const cv::Mat&imgInput, 
 	
 
 	
-	tPeakList* peaklist = m_pCheetahPeakFinder->GetPeakList();
-	m_pCheetahPeakFinder->reset_variables();
-	m_pCheetahPeakFinder->peakfinder8_moussa(data, mask, m_pCheetahPeakFinder->m_pix_r, asic_nx, asic_ny, nasics_x, nasics_y, ADCthresh, hitfinderMinSNR, hitfinderMinPixCount, hitfinderMaxPixCount, hitfinderLocalBGRadius);
+	tPeakList* peaklist = _cheetah_pf->GetPeakList();
+	_cheetah_pf->reset_variables();
+	_cheetah_pf->peakfinder8_moussa(data, mask, _cheetah_pf->m_pix_r, asic_nx, asic_ny, nasics_x, nasics_y, ADCthresh, hitfinderMinSNR, hitfinderMinPixCount, hitfinderMaxPixCount, hitfinderLocalBGRadius);
+	//m_pCheetahPeakFinder->peakfinder8_original(data, mask, pix_r, asic_nx, asic_ny, nasics_x, nasics_y, ADCthresh, hitfinderMinSNR, hitfinderMinPixCount, hitfinderMaxPixCount, hitfinderLocalBGRadius);
 	//m_pCheetahPeakFinder->killNearbyPeaks(hitfinderMaxPixCount * 3);
 	for (int i = 0; i < peaklist->nPeaks; i++)
 		detectedPeaks.emplace_back(cv::Point2f(binFactor * peaklist->peak_com_x[i], binFactor * peaklist->peak_com_y[i]));
 	
+	
 	return bool(peaklist->nPeaks);
 }
-// Function to find local maxima using dilation and erosion
-/*
-std::vector<cv::Point> CImageManager::bhFindLocalMaximum(cv::InputArray _src, int neighbor)
+bool CImageManager::detect_diffraction_peaks_imageJ(const cv::Mat& imgInput, const cv::Point2f& centralBeam, double pixelSize, double d_max, std::vector<cv::Point2f>& detectedPeaks, float tol)
 {
+	cv::Mat imgInputFloat = imgInput.clone();
+	imgInputFloat.convertTo(imgInputFloat, CV_32F);
 
-	cv::Mat src = _src.getMat();
-	cv::Mat peak_img = src.clone();
+	const int x_offsets[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+	const int y_offsets[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
 
-	// Dilate image to highlight peaks
-	cv::dilate(peak_img, peak_img, cv::Mat(), cv::Point(-1, -1), neighbor);
-	peak_img = peak_img - src;
+	const int height = imgInputFloat.rows;
+	const int width = imgInputFloat.cols;
+	const int consize = width * height;
 
-	// Erode image to flatten the non-peak regions
-	cv::Mat flat_img;
-	cv::erode(src, flat_img, cv::Mat(), cv::Point(-1, -1), neighbor);
-	flat_img = src - flat_img;
+	cv::Mat peak_img = cv::Mat::zeros(height, width, CV_32SC1);
+	std::vector<cv::Point2f> peak_list;
 
-	// Threshold both peak and flat images
-	cv::threshold(peak_img, peak_img, 0, 255, cv::THRESH_BINARY);
-	cv::threshold(flat_img, flat_img, 0, 255, cv::THRESH_BINARY);
-	cv::bitwise_not(flat_img, flat_img);
+	cv::Mat expixels = cv::Mat::zeros(height, width, CV_32SC1); 
+	cv::Mat clist = cv::Mat::zeros(height, width, CV_32SC1);    
 
-	// Combine peak and flat images to isolate local maxima
-	peak_img.setTo(cv::Scalar::all(255), flat_img);
-	cv::bitwise_not(peak_img, peak_img);
-
-	// Find contours of the local maxima
-	try {
-		cv::findContours(flat_img, m_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-	}
-	catch (const std::exception& e) {
-		std::cerr << "Exception: " << e.what() << std::endl;
-	}
-
-	double minContourArea = 10.0;  // Minimum contour area to consider as a peak
-
-	// Filter contours by area
-	for (size_t i = 0; i < m_contours.size(); i++) {
-		double contourArea = cv::contourArea(m_contours[i]);
-		if (contourArea >= minContourArea) {
-			// Calculate center of mass
-			cv::Moments m = cv::moments(m_contours[i], true);
-			if (m.m00 != 0) {
-				cv::Point center(m.m10 / m.m00, m.m01 / m.m00);
-				m_filteredCenters.push_back(center);
+	std::vector<int> p_indices;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			if (imgInputFloat.at<float>(y, x) > tol) {  
+				p_indices.push_back(y * width + x);
 			}
 		}
 	}
-	m_contours.clear();
 
-	// Sort peaks by contour area or intensity (optional)
-	std::sort(m_filteredCenters.begin(), m_filteredCenters.end(), [&](const cv::Point& a, const cv::Point& b) {
-		return src.at<uchar>(a) > src.at<uchar>(b);  // Sort by intensity at the peak
-		});
+	int index = 0;  
 
-	int maxPeaks = 100;
-	if (m_filteredCenters.size() > static_cast<size_t>(maxPeaks)) {
-		m_filteredCenters.resize(maxPeaks);  // Limit to maxPeaks
+	for (int p : p_indices) {
+		index++;
+		const int x = p % width;
+		const int y = p / width;
+		const float pval = imgInputFloat.at<float>(y, x);
+
+		// Skip already processed candidates
+		if (peak_img.at<int>(y, x) != 0) continue;
+
+		std::deque<int> exlist; 
+		bool is_peak = true;
+		exlist.push_back(p);
+		expixels.at<int>(y, x) = index;
+		peak_img.at<int>(y, x) = 32;  
+
+		while (!exlist.empty() && is_peak) {
+			const int current_p = exlist.front();
+			exlist.pop_front();
+
+			const int cx = current_p % width;
+			const int cy = current_p / width;
+
+			if (cx <= 0 || cy <= 0 || cx >= width - 1 || cy >= height - 1) continue;
+
+			for (int k = 0; k < 8; k++) {
+				const int nx = cx + x_offsets[k];
+				const int ny = cy + y_offsets[k];
+				const int np = ny * width + nx;
+
+				if (np == p) continue;
+
+				if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+				if (clist.at<int>(ny, nx) == index) continue;
+
+				const float neighbor_val = imgInputFloat.at<float>(ny, nx);
+				clist.at<int>(ny, nx) = index;
+
+				if (neighbor_val > pval) {
+					peak_img.at<int>(y, x) = 11;  // Mark reason
+					peak_img.at<int>(ny, nx) = 13;
+					is_peak = false;
+					exlist.clear();
+					break;
+				}
+
+				if (neighbor_val >= (pval - tol)) {
+					if (expixels.at<int>(ny, nx) != index) {
+						expixels.at<int>(ny, nx) = index;
+						exlist.push_back(np);
+					}
+					peak_img.at<int>(ny, nx) = 16;
+				}
+				else {
+					peak_img.at<int>(ny, nx) = 8;
+				}
+			}
+		}
+
+		if (is_peak) {
+			peak_list.push_back(cv::Point2f(x, y));  
+		}
+		else {
+			if (peak_img.at<int>(y, x) >= 16) {
+				peak_img.at<int>(y, x) = 1;
+			}
+		}
 	}
 
-	//filteredCenters.clear();
-	// Return the filtered centers directly (no need to call bhContoursCenter)
-	return m_filteredCenters;
+	// Filter peaks based on distance from central beam (optional)
+	detectedPeaks.clear();
+	for (const auto& peak : peak_list) {
+		double distance = cv::norm(peak - centralBeam) * pixelSize;
+		if (distance <= d_max) {
+			detectedPeaks.push_back(peak);
+		}
+	}
+
+	return !detectedPeaks.empty();
+	//return { peak_img, detectedPeaks };
 }
-*/
+
+
+
+bool CImageManager::detect_diffraction_peaks_imageJ2(const cv::Mat& imgInput, const cv::Point2f& centralBeam, double pixelSize, double d_max, std::vector<cv::Point2f>& detectedPeaks, float ntol)
+{
+	
+
+	double min, max;
+	cv::minMaxLoc(imgInput, &min, &max);
+	cv::Mat img;
+	imgInput.convertTo(img, CV_64F);
+	
+	cv::normalize(img, img, 0, 255, cv::NORM_MINMAX);
+
+
+	cv::Mat dilated;
+	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+	cv::dilate(img, dilated, kernel);
+	cv::Mat localMax;
+	cv::compare(img, dilated, localMax, cv::CMP_EQ);
+
+	double minVal;
+	cv::minMaxLoc(img, &minVal, nullptr);
+	cv::Mat minMask;
+	cv::compare(img, minVal, minMask, cv::CMP_EQ);
+	localMax.setTo(0, minMask);
+
+	struct Pixel {
+		cv::Point pt;
+		double intensity;
+	};
+	std::vector<Pixel> candidates;
+	for (int y = 0; y < localMax.rows; ++y)
+	{
+		for (int x = 0; x < localMax.cols; ++x)
+		{
+			if (localMax.at<uchar>(y, x))
+			{
+				Pixel p;
+				p.pt = cv::Point(x, y);
+				p.intensity = static_cast<double>(imgInput.at<uchar>(y, x));
+				candidates.push_back(p);
+			}
+		}
+	}
+
+	std::sort(candidates.begin(), candidates.end(), [](const Pixel& a, const Pixel& b) {
+		return a.intensity > b.intensity;
+		});
+
+	// Create a mask to mark processed pixels.
+	cv::Mat processed = cv::Mat::zeros(imgInput.size(), CV_8U);
+
+	const int directions[8][2] = { {0,-1}, {1,-1}, {1,0}, {1,1},
+								   {0,1}, {-1,1}, {-1,0}, {-1,-1} };
+
+	for (const auto& cand : candidates)
+	{
+		int x0 = cand.pt.x;
+		int y0 = cand.pt.y;
+		if (processed.at<uchar>(y0, x0))
+			continue; 
+
+		double seedIntensity = cand.intensity;
+		bool isMaximum = true;
+		std::vector<cv::Point> equalPoints;
+		std::vector<cv::Point> stack;
+
+		stack.push_back(cand.pt);
+		processed.at<uchar>(y0, x0) = 1;
+		equalPoints.push_back(cand.pt);
+		double sumX = x0, sumY = y0;
+		int countEqual = 1;
+
+		while (!stack.empty())
+		{
+			cv::Point pt = stack.back();
+			stack.pop_back();
+
+			for (int d = 0; d < 8; d++)
+			{
+				int nx = pt.x + directions[d][0];
+				int ny = pt.y + directions[d][1];
+
+				if (nx < 0 || ny < 0 || nx >= imgInput.cols || ny >= imgInput.rows)
+					continue;
+				if (processed.at<uchar>(ny, nx))
+					continue;
+
+				double neighborIntensity = static_cast<double>(imgInput.at<uchar>(ny, nx));
+
+				if (neighborIntensity > seedIntensity)
+					isMaximum = false;
+
+				if (neighborIntensity >= seedIntensity - ntol)
+				{
+					stack.push_back(cv::Point(nx, ny));
+					processed.at<uchar>(ny, nx) = 1;
+					if (neighborIntensity == seedIntensity)
+					{
+						equalPoints.push_back(cv::Point(nx, ny));
+						sumX += nx;
+						sumY += ny;
+						countEqual++;
+					}
+				}
+			}
+		}
+
+		if (isMaximum)
+		{
+			double cx = sumX / countEqual;
+			double cy = sumY / countEqual;
+			cv::Point bestPoint = equalPoints[0];
+			double bestDist = std::hypot(bestPoint.x - cx, bestPoint.y - cy);
+			for (const auto& pt : equalPoints)
+			{
+				double d = std::hypot(pt.x - cx, pt.y - cy);
+				if (d < bestDist)
+				{
+					bestDist = d;
+					bestPoint = pt;
+				}
+			}
+			detectedPeaks.push_back(cv::Point2f(bestPoint.x, bestPoint.y));
+		}
+	}
+	return !detectedPeaks.empty();
+
+}
+
 
 
 std::vector<cv::Point> CImageManager::bhFindLocalMaximum(const cv::InputArray& _src, const cv::InputArray& _mask, int neighbor, int maxPeaks, float minContourArea, float minDistance)
@@ -1137,30 +1223,24 @@ std::vector<cv::Point> CImageManager::bhFindLocalMaximum(const cv::InputArray& _
 	cv::Mat src = _src.getMat();
 	cv::Mat peak_img = src.clone();
 
-	// Step 1: Dilate image to highlight peaks
 	cv::dilate(peak_img, peak_img, cv::Mat(), cv::Point(-1, -1), neighbor);
 	peak_img = peak_img - src;
 
-	// Step 2: Erode image to flatten the non-peak regions
 	cv::Mat flat_img;
 	cv::erode(src, flat_img, cv::Mat(), cv::Point(-1, -1), neighbor);
 	flat_img = src - flat_img;
 
-	// Step 3: Threshold both peak and flat images
 	cv::threshold(peak_img, peak_img, 0, 255, cv::THRESH_BINARY);
 	cv::threshold(flat_img, flat_img, 0, 255, cv::THRESH_BINARY);
 	cv::bitwise_not(flat_img, flat_img);
 
-	// Step 4: Combine peak and flat images to isolate local maxima
 	peak_img.setTo(cv::Scalar::all(255), flat_img);
 	cv::bitwise_not(peak_img, peak_img);
 
-	// Step 5: Use connectedComponentsWithStats instead of findContours
 	cv::Mat labels, stats, centroids;
 	int numLabels = cv::connectedComponentsWithStats(peak_img, labels, stats, centroids);
 
 	std::vector<cv::Point> filteredCenters;
-	// Step 6: Filter components by area and store their centroids
 	for (int i = 1; i < numLabels; i++) {  // Start from 1 to skip the background
 		int area = stats.at<int>(i, cv::CC_STAT_AREA);
 		if (area >= minContourArea) {
@@ -1170,19 +1250,16 @@ std::vector<cv::Point> CImageManager::bhFindLocalMaximum(const cv::InputArray& _
 		}
 	}
 
-	// Step 7: Sort by intensity if we have more than maxPeaks
 	if (filteredCenters.size() > static_cast<size_t>(maxPeaks)) {
 		std::sort(filteredCenters.begin(), filteredCenters.end(), [&](const cv::Point& a, const cv::Point& b) {
 			return src.at<uchar>(a) > src.at<uchar>(b);  // Sort by intensity at the peak
 			});
 	}
 
-	// Step 8: Remove peaks that are too close (less than minDistance apart)
 	std::vector<cv::Point> finalPeaks;
 	for (const auto& peak : filteredCenters) {
 		bool tooClose = false;
 
-		// Check against already selected peaks in finalPeaks
 		for (const auto& selectedPeak : finalPeaks) {
 			if (cv::norm(peak - selectedPeak) < minDistance) {
 				tooClose = true;
@@ -1201,7 +1278,6 @@ std::vector<cv::Point> CImageManager::bhFindLocalMaximum(const cv::InputArray& _
 		}
 	}
 
-	// Return the final filtered peaks
 	return finalPeaks;
 }
 
@@ -1209,53 +1285,11 @@ std::vector<cv::Point> CImageManager::bhFindLocalMaximum(const cv::InputArray& _
 
 std::vector<cv::Point> CImageManager::bhFindLocalMaximumGFTT(const cv::InputArray& _src, const cv::InputArray& _mask, int neighbor, int maxCorners, float qualityLevel, float minDistance)
 {
-	/*cv::Mat src = _src.getMat();
-	cv::Mat peak_img = src.clone();
-
-	// Dilate image to highlight peaks
-	cv::dilate(peak_img, peak_img, cv::Mat(), cv::Point(-1, -1), neighbor);
-	peak_img = peak_img - src;
-
-	// Erode image to flatten the non-peak regions
-	cv::Mat flat_img;
-	cv::erode(src, flat_img, cv::Mat(), cv::Point(-1, -1), neighbor);
-	flat_img = src - flat_img;
-
-	// Threshold both peak and flat images
-	cv::threshold(peak_img, peak_img, 0, 255, cv::THRESH_BINARY);
-	cv::threshold(flat_img, flat_img, 0, 255, cv::THRESH_BINARY);
-	cv::bitwise_not(flat_img, flat_img);
-
-	// Combine peak and flat images to isolate local maxima
-	peak_img.setTo(cv::Scalar::all(255), flat_img);
-	cv::bitwise_not(peak_img, peak_img);*/
-
-	// Now apply GFTT (Good Features to Track)
+	
 	std::vector<cv::Point2f> corners;
 	cv::goodFeaturesToTrack(_src, corners, maxCorners, qualityLevel, minDistance, _mask);
 
 	std::vector<cv::Point> finalPeaks;
-	/*for (const auto& peak : corners) {
-		bool tooClose = false;
-
-		// Check against already selected peaks in finalPeaks
-		for (const auto& selectedPeak : finalPeaks) {
-			if (cv::norm(peak - cv::Point2f(selectedPeak)) < minDistance) {
-				tooClose = true;
-				break;
-			}
-		}
-
-		// Only add the peak if it's not too close to any already selected peaks
-		if (!tooClose) {
-			finalPeaks.push_back(peak);
-		}
-
-		// Stop if we reach the max number of peaks
-		if (finalPeaks.size() >= static_cast<size_t>(maxCorners)) {
-			break;
-		}
-	}*/
 
 	for (const auto& peak : corners)
 		finalPeaks.push_back(peak);
@@ -1265,7 +1299,6 @@ std::vector<cv::Point> CImageManager::bhFindLocalMaximumGFTT(const cv::InputArra
 }
 
 
-// Helper function to find the center of mass of contours
 std::vector<cv::Point> CImageManager::bhContoursCenter(const std::vector<std::vector<cv::Point>>& contours, bool centerOfMass, int contourIdx)
 {
 	std::vector<cv::Point> result;
@@ -1312,6 +1345,487 @@ void CImageManager::draw_resolution_rings(cv::Mat& imgOutput, const cv::Point2f&
 			cv::circle(imgOutput, beamLocation, static_cast<int>(radiusPixels), cv::Scalar(35000, 35000, 35000), thickness, cv::LINE_AA);
 		}
 	}
+
+	// Draw a circle in the middle of the image
+	cv::circle(imgOutput, cv::Point(imgOutput.cols / 2, imgOutput.rows / 2), CDataCollection::GetInstance()->m_fCentralBeamTolerance, cv::Scalar(35000, 0, 0), 1, cv::LINE_AA);
+	cv::circle(imgOutput, cv::Point(imgOutput.cols / 2, imgOutput.rows / 2), 10, cv::Scalar(35000, 0, 0), 1, cv::LINE_AA);
+}
+
+void CImageManager::adjustImageJStyle(cv::Mat& image, double min_val, double max_val) {
+	cv::Mat image_float;
+	image.convertTo(image_float, CV_32F);
+
+	image_float = (image_float - min_val) * (255.0 / (max_val - min_val));
+
+	cv::threshold(image_float, image_float, 255, 255, cv::THRESH_TRUNC);
+	cv::threshold(image_float, image_float, 0, 0, cv::THRESH_TOZERO); 
+
+	cv::Mat adjusted;
+	image_float.convertTo(image, CV_8U); 
+}
+
+
+void CImageManager::adjustBrightnessContrast(const cv::Mat& image, int min_val, int max_val, int target_min = 0, int target_max = 4095) {
+	cv::Mat image_float, adjusted;
+
+	image.convertTo(image_float, CV_32F);
+
+	image_float = image_float - min_val;
+
+	float scale = static_cast<float>(target_max - target_min) / (max_val - min_val);
+	image_float = image_float * scale;
+
+	cv::min(image_float, target_max, image_float);
+	cv::max(image_float, target_min, image_float);
+
+	image_float.convertTo(image, CV_16U);
+}
+
+void CImageManager::computeHistogramBasedMinMax(const cv::Mat& image, double& min_val, double& max_val, double lower_percentile = 2.0, double upper_percentile = 98.0) {
+	int histSize = int(std::pow(2, 16)); 
+	float range[] = { 0, histSize };
+	const float* histRange = { range };
+
+	cv::Mat hist;
+	cv::calcHist(&image, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange);
+
+	int total_pixels = image.total();
+	int lower_thresh = static_cast<int>(total_pixels * (lower_percentile / 100.0));
+	int upper_thresh = static_cast<int>(total_pixels * (upper_percentile / 100.0));
+
+	int cumulative = 0;
+	min_val = 0;
+	max_val = histSize;
+
+	// Find min_val (2% percentile)
+	for (int i = 0; i < histSize; i++) {
+		cumulative += hist.at<float>(i);
+		if (cumulative >= lower_thresh) {
+			min_val = i;
+			break;
+		}
+	}
+
+	cumulative = 0;
+	// Find max_val (98% percentile)
+	for (int i = 0; i < histSize; i++) {
+		cumulative += hist.at<float>(i);
+		if (cumulative >= upper_thresh) {
+			max_val = i;
+			break;
+		}
+	}
+}
+
+struct MouseData {
+	cv::Mat& image;
+	cv::Mat& orgImg;
+	std::vector<cv::Point>& points;
+	std::vector<cv::Point2f>& detectedPeaks;
+	std::vector<cv::RotatedRect>& ellipses;
+	std::vector < cv::Point3f>& circle;
+	std::string windowName;
+};
+
+// Function to find the closest detected peak within 5 pixels
+cv::Point CImageManager::findClosestPeak(int x, int y, const std::vector<cv::Point2f>& peaks, int maxDistance = 10) {
+	cv::Point closestPoint(x, y);
+	double minDist = maxDistance + 1; 
+
+	for (const auto& peak : peaks) {
+		double dist = cv::norm(cv::Point2f(x, y) - peak);
+		if (dist <= maxDistance && dist < minDist) {
+			closestPoint = peak;
+			minDist = dist;
+		}
+	}
+	return closestPoint;
+}
+
+// For debugging, trying to measure elliptical distortion values
+void  CImageManager::onMousePowderRings(int event, int x, int y, int flags, void* userdata) {
+
+	auto* data = static_cast<MouseData*>(userdata); 
+	auto pImgMgr = CImageManager::GetInstance();
+
+	if (event == cv::EVENT_LBUTTONDOWN) {
+		cv::Point2f selectedPoint = pImgMgr->findClosestPeak(x, y, data->detectedPeaks); 
+		data->points.emplace_back(selectedPoint); 
+				
+	}
+	else if (event == cv::EVENT_RBUTTONDBLCLK)
+	{
+		if (data->points.size() >= 5) { 
+			data->ellipses.emplace_back(cv::fitEllipse(data->points));
+			pImgMgr->m_ellipses.push_back(cv::fitEllipse(data->points));
+
+			printf("Ellipse Size: %d\n", pImgMgr->m_ellipses.size());
+			cv::Point2f center;
+			float radius;
+			cv::minEnclosingCircle(data->points, center, radius);
+			data->circle.emplace_back(cv::Point3f(center.x, center.y, radius));
+
+			// Compute EPS (Ellipticity)
+			double major_axis = std::max(data->ellipses.back().size.width, data->ellipses.back().size.height);
+			double minor_axis = std::min(data->ellipses.back().size.width, data->ellipses.back().size.height);
+			double EPS = minor_axis / major_axis;
+
+			// Get PHI (orientation angle)
+			double PHI = data->ellipses.back().angle; 
+
+			
+
+			// Print EPS and PHI
+			std::cout << "Ellipse: Center = " << data->ellipses.back().center << ", EPS =" << EPS << ", PHI = " << PHI << " degrees" << std::endl;
+			data->points.clear();
+		}
+	}
+	else if (event == cv::EVENT_MBUTTONDOWN) {
+
+
+		std::cout << "Performing distortion correction..." << std::endl;
+		double EPS = 0.0;        // elliptical distortion parameter
+		double PHI = 0.0;    // distortion angle (degrees)
+		double X_center = 0.0;  // distortion center X (pixels)
+		double Y_center = 0.0;  // distortion center Y (pixels)
+		for (auto& ellipse : data->ellipses)
+		{
+			double major_axis = std::max(ellipse.size.width, ellipse.size.height);
+			double minor_axis = std::min(ellipse.size.width, ellipse.size.height);
+			EPS += (minor_axis / major_axis);
+
+			PHI += ellipse.angle;
+
+			X_center += ellipse.center.x;
+			Y_center += ellipse.center.y;
+		}
+
+		EPS /= data->ellipses.size();
+		PHI /= data->ellipses.size();
+		X_center /= data->ellipses.size();
+		Y_center /= data->ellipses.size();
+		
+		X_center /= IMG_RESIZE_FACTOR_;
+		Y_center /= IMG_RESIZE_FACTOR_;
+
+		std::cout << "EPS = " << EPS << ", PHI = " << PHI << " degrees" << std::endl;
+		std::cout << "X_center = " << X_center << ", Y_center = " << Y_center << std::endl;
+
+		// Convert PHI to radians
+		double phi_rad = PHI * CV_PI / 180.0;
+		double cos_phi = std::cos(phi_rad);
+		double sin_phi = std::sin(phi_rad);
+
+		// Compute the distortion matrix U
+		cv::Mat U = (cv::Mat_<double>(2, 2) <<
+			std::pow(cos_phi, 2) + EPS * std::pow(sin_phi, 2),
+			sin_phi * cos_phi - EPS * sin_phi * cos_phi,
+			cos_phi * sin_phi - EPS * sin_phi * cos_phi,
+			std::pow(sin_phi, 2) + EPS * std::pow(cos_phi, 2));
+
+		cv::Mat M = (cv::Mat_<double>(2, 3) <<
+			U.at<double>(0, 0), U.at<double>(0, 1),
+			-U.at<double>(0, 0) * X_center - U.at<double>(0, 1) * Y_center + X_center,
+			U.at<double>(1, 0), U.at<double>(1, 1),
+			-U.at<double>(1, 0) * X_center - U.at<double>(1, 1) * Y_center + Y_center);
+
+		// Load the distorted image
+		cv::Mat distorted_image = data->orgImg.clone();
+
+		// Apply the inverse transformation
+		cv::Mat corrected_image;
+		cv::warpAffine(
+			distorted_image, corrected_image, M, distorted_image.size(),
+			cv::INTER_NEAREST,     
+			cv::BORDER_CONSTANT,   
+			cv::Scalar(0)
+		);
+
+		std::string fileName = "F:/3D_Electron_Diffraction/3D_ED_Samples/LuAg/005__DIST_115/test/Corrected_Image-a.tiff";
+		TinyTIFFWriterFile* tiffwriter = TinyTIFFWriter_open(fileName.c_str(), 16, TinyTIFFWriter_Int, 1, 516, 516, TinyTIFFWriter_Greyscale);
+		if (tiffwriter)
+		{
+			TinyTIFFWriter_writeImage(tiffwriter, corrected_image.data);
+			TinyTIFFWriter_close(tiffwriter);
+		}
+	}
+}
+void CImageManager::apply_distortion_corrections(const cv::Mat& dist_img, std::string&fileName, float EPS, float PHI, float X_center, float Y_center)
+{	
+	// Adapted from --> https://xds.mr.mpg.de/html_doc/geocorr.html
+
+	double phi_rad = PHI * CV_PI / 180.0;
+	double cos_phi = std::cos(phi_rad);
+	double sin_phi = std::sin(phi_rad);
+
+	cv::Mat U = (cv::Mat_<double>(2, 2) <<
+		std::pow(cos_phi, 2) + EPS * std::pow(sin_phi, 2),
+		sin_phi * cos_phi - EPS * sin_phi * cos_phi,
+		cos_phi * sin_phi - EPS * sin_phi * cos_phi,
+		std::pow(sin_phi, 2) + EPS * std::pow(cos_phi, 2));
+
+	cv::Mat M = (cv::Mat_<double>(2, 3) <<
+		U.at<double>(0, 0), U.at<double>(0, 1),
+		-U.at<double>(0, 0) * X_center - U.at<double>(0, 1) * Y_center + X_center,
+		U.at<double>(1, 0), U.at<double>(1, 1),
+		-U.at<double>(1, 0) * X_center - U.at<double>(1, 1) * Y_center + Y_center);
+
+	cv::Mat distorted_image = dist_img.clone();
+
+	cv::Mat corrected_image;
+	cv::warpAffine(
+		dist_img, corrected_image, M, dist_img.size(),
+		cv::INTER_NEAREST,      
+		cv::BORDER_CONSTANT,   
+		cv::Scalar(0)
+	);
+
+
+	TinyTIFFWriterFile* tiffwriter = TinyTIFFWriter_open(fileName.c_str(), 16, TinyTIFFWriter_Int, 1, 516, 516, TinyTIFFWriter_Greyscale);
+	if (tiffwriter)
+	{
+		TinyTIFFWriter_writeImage(tiffwriter, corrected_image.data);
+		TinyTIFFWriter_close(tiffwriter);
+	}
+	
+}
+
+std::string BrowseFolder(const std::wstring& title = L"Select a folder")
+{
+	std::string result;
+
+	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+	if (FAILED(hr))
+	{
+		MessageBoxA(NULL, "Failed to initialize COM.", "Error", MB_OK | MB_ICONERROR);
+		return result;
+	}
+
+	IFileDialog* pFileDialog = nullptr;
+	hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+
+	if (SUCCEEDED(hr))
+	{
+		DWORD dwOptions;
+		pFileDialog->GetOptions(&dwOptions);
+		pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+		pFileDialog->SetTitle(title.c_str());
+
+		hr = pFileDialog->Show(NULL);
+		if (SUCCEEDED(hr))
+		{
+			IShellItem* pItem = nullptr;
+			hr = pFileDialog->GetResult(&pItem);
+			if (SUCCEEDED(hr))
+			{
+				PWSTR pszFilePath = nullptr;
+				hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+				if (SUCCEEDED(hr))
+				{
+					char path[MAX_PATH];
+					WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, path, MAX_PATH, NULL, NULL);
+					result = std::string(path) + "/";
+					CoTaskMemFree(pszFilePath);
+				}
+				pItem->Release();
+			}
+		}
+		pFileDialog->Release();
+	}
+
+	CoUninitialize();
+	return result;
+}
+
+// ALso for debugging, this function is terribly written.
+void CImageManager::calibrate_distortions()
+{
+	CDataCollection* pDC = CDataCollection::GetInstance();
+	CTimepix* pTpx = CTimepix::GetInstance();
+
+	std::string sPath = BrowseFolder(L"Select Folder containing Powder ring patterns.");// "F:/3D_Electron_Diffraction/3D_ED_Samples/LuAg/005__DIST_115";
+	std::string sDataPath = BrowseFolder(L"Select Folder containing data to correct");
+
+	if (sPath == "" || sDataPath == "")
+	{
+		printf("Please select the directories.");
+		return;
+	}
+
+	std::string sOutputPath = sDataPath + "Corrected_Images/";
+	
+
+	std::vector<cv::String> filenames;
+	cv::glob(sPath, filenames);
+
+	CCheetah_PeakFinder* cheetah_pf_tpx = nullptr;
+	cv::Point2f centralBeamPos = cv::Point2f(0, 0);
+	SCameraLengthSettings m_oCameraSettings(pDC->m_fCameraLength);
+	std::vector<cv::Point> points;
+	std::vector<cv::RotatedRect> ellipses;
+	std::vector<cv::Point3f> circles;
+	std::string windowName = "Powder Ring Images";
+	cv::namedWindow(windowName);
+
+	int fileIdx = 0;
+	cv::Mat ringImg = cv::imread(filenames[fileIdx], cv::IMREAD_UNCHANGED);
+	cv::Mat ringImgCopy = ringImg.clone();
+	cv::Mat ringImgRAW = ringImg.clone();
+	cv::resize(ringImgCopy, ringImgCopy, cv::Size(), IMG_RESIZE_FACTOR_, IMG_RESIZE_FACTOR_);
+	while(fileIdx < filenames.size())
+	{
+
+		if (cheetah_pf_tpx == nullptr)
+			cheetah_pf_tpx = new CCheetah_PeakFinder(ringImgCopy.rows, ringImgCopy.cols);
+
+		double min_val, max_val;
+		cv::minMaxLoc(ringImgCopy, &min_val, &max_val);
+		ringImgCopy.convertTo(ringImg, CV_16UC1, std::pow(2, 16) / max_val);
+
+		this->computeHistogramBasedMinMax(ringImg, min_val, max_val);
+		this->adjustImageJStyle(ringImg, pTpx->m_fBrightnessDiff, min_val + 10 + max_val / (0.01f * pTpx->m_fContrastDiff + 0.001f));
+
+		bool bCentralBeamValid = this->find_central_beam_position(ringImgCopy, centralBeamPos);
+		if (bCentralBeamValid == false)
+			continue;
+		
+		m_oCameraSettings.UpdateCameraLengthSettings(pDC->m_fCameraLength);
+		std::vector <cv::Point2f> detectedPeaks;
+		this->detect_diffraction_peaks_cheetahpf8(cheetah_pf_tpx, ringImgCopy, centralBeamPos, m_oCameraSettings.flPixelSize / IMG_RESIZE_FACTOR_, pDC->m_fSerialED_dmax, detectedPeaks, pDC->m_fSerialED_i_sigma, pDC->m_fSerialED_peaksize, pDC->m_fSerialED_peakthreshold, 1);
+
+		cv::cvtColor(ringImg, ringImg, cv::COLOR_GRAY2BGR);
+		for (const auto& peak : detectedPeaks) {
+			cv::circle(ringImg, peak, pDC->m_fSerialED_peaksize, cv::Scalar(0, 255, 0), 1);
+		}
+
+		for (const auto& point : points)
+		{
+			cv::circle(ringImg, point, pDC->m_fSerialED_peaksize, cv::Scalar(0, 0, 255), -1);
+		}
+
+		for (const auto& Ellipse : ellipses) {
+			cv::ellipse(ringImg, Ellipse, cv::Scalar(0, 0, 255), 1);
+			cv::circle(ringImg, Ellipse.center, 15, cv::Scalar(255, 0, 255), 1);
+		}
+
+		for (const auto& circle : circles)
+		{
+			cv::circle(ringImg, cv::Point(circle.x, circle.y), circle.z, cv::Scalar(255, 0, 0), 2);
+		}
+
+		cv::imshow(windowName, ringImg);
+		MouseData data = { ringImgCopy, ringImgRAW, points, detectedPeaks, ellipses, circles, windowName };
+		cv::setMouseCallback(windowName, onMousePowderRings, &data);
+		auto q = cv::waitKey(100);
+		if (q == 'n' || q == 'N')
+		{
+			fileIdx++;
+			points.clear();
+			ellipses.clear();
+			circles.clear();
+
+			if (fileIdx < filenames.size())
+			{
+				printf("Loading image: %s\n", filenames[fileIdx].c_str());
+				ringImg = cv::imread(filenames[fileIdx], cv::IMREAD_UNCHANGED);
+				ringImgCopy = ringImg.clone();
+				ringImgRAW = ringImg.clone();
+				cv::resize(ringImgCopy, ringImgCopy, cv::Size(), IMG_RESIZE_FACTOR_, IMG_RESIZE_FACTOR_);
+			}
+		}
+		else if (q == 'p' || q == 'P')
+		{
+			fileIdx--;
+			points.clear();
+			ellipses.clear();
+			circles.clear();
+			if (fileIdx >= 0)
+			{
+				printf("Loading image: %s\n", filenames[fileIdx].c_str());
+				ringImg = cv::imread(filenames[fileIdx], cv::IMREAD_UNCHANGED);
+				ringImgCopy = ringImg.clone();
+				ringImgRAW = ringImg.clone();
+				cv::resize(ringImgCopy, ringImgCopy, cv::Size(), IMG_RESIZE_FACTOR_, IMG_RESIZE_FACTOR_);
+			}
+		}
+		else if (q == 'r' || q == 'R')
+		{
+			printf("Reloading image: %s\n", filenames[fileIdx].c_str());
+			ringImg = cv::imread(filenames[fileIdx], cv::IMREAD_UNCHANGED);
+			ringImgCopy = ringImg.clone();
+			ringImgRAW = ringImg.clone();
+			cv::resize(ringImgCopy, ringImgCopy, cv::Size(), IMG_RESIZE_FACTOR_, IMG_RESIZE_FACTOR_);
+		}
+		else if (q == 'q' || q == 'Q')
+		{
+			break;
+		}
+
+	}
+	cv::destroyWindow(windowName);
+
+
+
+	CWriteFile::create_directory(sOutputPath);
+	// Get Average values for EPS, PHI, X_center, Y_center
+	int numEllipses = m_ellipses.size();
+	float EPS = 0.0f;
+	float PHI = 0.0f;;
+	float X_center = 0.0f;
+	float Y_center = 0.0f;
+
+	if (numEllipses > 0)
+	{
+		for (auto& ellipse : m_ellipses)
+		{
+			double major_axis = std::max(ellipse.size.width, ellipse.size.height);
+			double minor_axis = std::min(ellipse.size.width, ellipse.size.height);
+			EPS += (minor_axis / major_axis);
+
+			PHI += ellipse.angle;
+
+			X_center += ellipse.center.x;
+			Y_center += ellipse.center.y;
+		}
+
+		EPS /= numEllipses;
+		PHI /= numEllipses;
+		X_center /= numEllipses;
+		Y_center /= numEllipses;
+
+		//X_center /= IMG_RESIZE_FACTOR_;
+		//Y_center /= IMG_RESIZE_FACTOR_;
+
+
+		X_center = Y_center = ringImgRAW.rows * 0.5f;
+
+		printf("EPS = %f\nPHI = %f\nX_center = %f\nY_center = %f\n", EPS, PHI, X_center, Y_center);
+
+		int imgIndex = 0;
+		for (const auto& entry : std::filesystem::directory_iterator(sDataPath))
+		{
+			if (entry.path().extension() == ".tiff")
+			{
+				imgIndex++;
+
+				// Load the image
+				cv::Mat img = cv::imread(entry.path().string(), cv::IMREAD_UNCHANGED);
+
+				std::string fullImgName = sOutputPath + std::format("{:05d}.tiff", imgIndex);
+				this->apply_distortion_corrections(img, fullImgName, EPS, PHI, X_center, Y_center);
+
+			}
+		}
+	}
+	else
+	{
+		std::cout << "No Ellipses found for distortion correction" << std::endl;
+		return;
+	}
+	
+
+	m_ellipses.clear();
+	delete cheetah_pf_tpx;
 }
 
 void CImageManager::find_beam_position_hough_circles(cv::Mat& _Img, ImagesInfo& imgInfo)
@@ -1384,7 +1898,7 @@ CImageManager* CImageManager::GetInstance()
 
 CImageManager::~CImageManager()
 {
-	PRINTD("\t\t\t\tCImageManager::~CImageManager() - Destructor\n");
+	PRINTD("\t\tCImageManager::~CImageManager() - Destructor\n");
 	SAFE_RELEASE(m_pImgMgr);
 	SAFE_RELEASE(m_pCheetahPeakFinder);
 	

@@ -108,12 +108,16 @@ struct GridRegions
 	cv::Rect2f gridRegion;
 	float stage_z;
 	float angle;
+	float currentRegionStageX;
+	float currentRegionStageY;
 	bool isRegionScanned;
+	bool isNewRegionScan;
 
 	GridRegions() {
 		stage_z = 0.0f;
 		angle = 0.0f;
 		isRegionScanned = false;
+		isNewRegionScan = true;
 	}
 
 };
@@ -125,10 +129,13 @@ public:
 	CTimer					m_oTrackingTimer;
 	CTimer					m_oRecordTimer;
 	CDialogEx*				m_pDlg;
-
+	CCheetah_PeakFinder*	m_pCheetahPeakFinder;
+	std::mutex				m_SerialEDMutex;
+	std::mutex				m_serialEDFileIndexMutex;
 	void fine_beam_shift_calibration(int order = 4);
 	cv::Mat poly_fit(std::vector<cv::Point2f>& points, unsigned int order);
-	
+	std::atomic<unsigned int> m_imgIndex;
+	std::atomic<unsigned int> m_validImgCount;
 
 
 
@@ -224,6 +231,7 @@ public:
 	float m_fSerialED_peakthreshold;
 	float m_fSerialED_i_sigma;
 	float m_fSerialED_peaksize;
+	float m_fCentralBeamTolerance;
 	int   m_iSerialED_min_num_peaks;
 	
 	bool m_bTimeBasedTrack;
@@ -244,6 +252,7 @@ public:
 	bool m_bOnTracking;
 	bool m_bOnRecording;
 	bool m_bOnRotateRequest;
+	
 
 	bool m_bIs2DMapVisible;
 	bool m_bSerialEDScanRegions;
@@ -281,7 +290,6 @@ public:
 
 
 	void set_control_manager(CTEMControlManager* _pCtrlMgr);
-	void Test();
 	void display_images_and_calculate_z_value();
 	void display_images_and_create_tracking_data_tem();
 	void display_images_and_create_tracking_data_stem();
@@ -330,9 +338,7 @@ private:
 	bool move_to_point_time_based_stem(cv::Point2f& _startingPos, cv::Point2f& _targetPos, float _duration_ms, unsigned int _startingTime, unsigned int _currentTime);
 	bool move_to_point_angle_based(cv::Point2f& _start, cv::Point2f& _end, float _duration_ms);
 
-	void do_collect_frames();
 	void tcp_do_collect_frames();
-	void do_live_stream_collected_frames();
 	void do_tilt_backlash_correction(float _fTargetAngle, bool _bPositiveDirection, float _offset = 5.0f, bool steps = false);
 	
 
@@ -352,7 +358,7 @@ private:
 	void display_2d_map();
 	static void onMouse_2DMap(int event, int x, int y, int, void* userdata); 
 	void do_serial_ed_regions_scan();
-	void serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec, unsigned int& imgIndex, unsigned int& validImgCount);
+	void serial_ed_store_valid_images_to_disk(std::vector<_img_data>& img_data_vec);
 public:
 	bool is_diffraction_pattern_valid(const cv::Mat&diffractionImg, int num_of_peaks, float d_max, bool bUseGFTT = true);
 
@@ -366,7 +372,6 @@ public:
 	void do_find_eucentric_height_regions_ex();
 	void do_record_ex();
 	void do_track_ex();
-	void do_collect_frames_ex();
 	void tcp_do_collect_frames_ex();
 	void infinite_loop_for_monitoring_ex();
 	void do_set_current_beam_screen_coordinates(float x, float y, bool bLog = true) { 
@@ -389,6 +394,7 @@ public:
 	// Saving / Loading parameters
 	std::vector<my_params> save_parameters();
 	std::vector<my_params> save_tracking_data();
+	std::vector<my_params> save_serialed_data();
 	void restore_parameters();
 	void restore_tracking_data();
 	

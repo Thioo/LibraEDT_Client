@@ -23,7 +23,7 @@ float CZeissStage::get_stage_z()
 
 CZeissStage::~CZeissStage()
 {
-	PRINTD("\t\t\t\tCZeissStage::~CZeissStage() - Destructor\n");
+	PRINTD("\t\tCZeissStage::~CZeissStage() - Destructor\n");
 }
 
 CZeissStage::CZeissStage(CTEMControlManager* _pControlManager)

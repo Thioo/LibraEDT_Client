@@ -23,6 +23,7 @@ public:
 	bool WriteToFile(std::string _filename, std::map<unsigned int, CVec>& _map, bool _bEverything = false);
 	void write_params_file();
 	void write_tracking_data(std::string& fileName);
+	void write_serial_data(std::string& fileName);
 	void read_params_file(std::string sFileName = "", std::map<std::string, std::string>* configMap = nullptr);
 	std::string GenerateNewFileName(float _From, float _To, unsigned int _index);
 	static CWriteFile* GetInstance();

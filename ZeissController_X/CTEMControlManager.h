@@ -44,6 +44,7 @@ public:
 	CZeissStage*		m_pStage;
 	CDataCollection*	m_pZeissDataCollection;
 	CImageManager*		m_pImageManager;
+
 	bool				m_bSaveLensParams;
 	bool Initialised() const {
 		if (m_bInitialised == false)
@@ -58,7 +59,6 @@ public:
 private:
 	// Api Setup methods
 	bool InitializeApi();
-	bool PatchLicense();
 	void CreateConsole();
 
 	// Private Api control methods

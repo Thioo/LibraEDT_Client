@@ -62,6 +62,9 @@
 #include <xtensor.hpp>
 #include <xtensor-fftw/basic.hpp>
 #include <xtensor-fftw/helper.hpp>
+#include <atomic>
+#include <execution>
+#include <mutex>
 
 // For the GUI
 #include <windows.h>	

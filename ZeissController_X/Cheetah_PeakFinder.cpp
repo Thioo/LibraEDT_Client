@@ -6,9 +6,10 @@
 #include <math.h>
 #include <stdlib.h>
 
-CCheetah_PeakFinder* CCheetah_PeakFinder::m_pCheetahPeakFinder = nullptr;
 
+// Stolen/Adapted from --> https://github.com/antonbarty/cheetah
 
+//CCheetah_PeakFinder* CCheetah_PeakFinder::m_pCheetahPeakFinder = nullptr;
 
 /*
  *	Create arrays for remembering Bragg peak data
@@ -66,8 +67,6 @@ CCheetah_PeakFinder::CCheetah_PeakFinder(unsigned int rows, unsigned int cols)
 	
 	allocatePeakList(&peaklist, 500);
 
-	
-
 	pix_nn = rows * cols;
 	m_inx = (long*)malloc(pix_nn * sizeof(long));
 	m_iny = (long*)malloc(pix_nn * sizeof(long));
@@ -108,9 +107,6 @@ CCheetah_PeakFinder::~CCheetah_PeakFinder()
 	free(m_roffset);
 	free(m_rcount);
 	free(m_rthreshold);
-
-
-
 
 }
 
@@ -996,6 +992,8 @@ int CCheetah_PeakFinder::peakfinder8_moussa(float* data, char* mask, float* pix_
 	memcpy(temp, data, pix_nn * sizeof(float));*/
 	float* temp = data;
 
+	if (temp == nullptr)
+		return FALSE;
 
 	/*
 	 *	Apply mask (multiply data by 0 to ignore regions - this makes data below threshold for peak finding)
@@ -1707,21 +1705,23 @@ void CCheetah_PeakFinder::reset_variables()
 
 CCheetah_PeakFinder* CCheetah_PeakFinder::GetInstance(unsigned int rows, unsigned int cols)
 {
-	if (m_pCheetahPeakFinder == NULL)
+	//if (m_pCheetahPeakFinder == NULL)
 	{
-		m_pCheetahPeakFinder = new CCheetah_PeakFinder(rows, cols);
+		//m_pCheetahPeakFinder = new CCheetah_PeakFinder(rows, cols);
 	}
-	return m_pCheetahPeakFinder;
-}
-
-CCheetah_PeakFinder* CCheetah_PeakFinder::GetInstance()
-{
-	if (m_pCheetahPeakFinder)
-		return m_pCheetahPeakFinder;
-	else
-		printf("Error: CCheetah_PeakFinder instance not created\n");
+	//return m_pCheetahPeakFinder;
+	MB("Error: CCheetah_PeakFinder instance not created\n");
 	return nullptr;
 }
+
+//CCheetah_PeakFinder* CCheetah_PeakFinder::GetInstance()
+//{
+	//if (m_pCheetahPeakFinder)
+		//return m_pCheetahPeakFinder;
+	//else
+		//printf("Error: CCheetah_PeakFinder instance not created\n");
+	//return nullptr;
+//}
 
 tPeakList* CCheetah_PeakFinder::GetPeakList()
 {
